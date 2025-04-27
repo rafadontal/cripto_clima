@@ -51,7 +51,7 @@ def get_latest_video_id(channel_url: str):
 
         # Get the latest video from the channel
         request = youtube.search().list(
-            part="id",
+            part="snippet",  # Changed to include snippet for more info
             channelId=channel_id,
             order="date",
             maxResults=1,
@@ -61,8 +61,14 @@ def get_latest_video_id(channel_url: str):
         
         if not response['items']:
             raise ValueError("No videos found in channel")
+        
+        # Print video details for debugging
+        video = response['items'][0]
+        print(f"\nLatest video found:")
+        print(f"Title: {video['snippet']['title']}")
+        print(f"Published: {video['snippet']['publishedAt']}")
             
-        return response['items'][0]['id']['videoId']
+        return video['id']['videoId']
     except Exception as e:
         return f"Error fetching videos from channel: {e}"
 
