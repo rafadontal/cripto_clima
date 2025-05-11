@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Channel Summaries</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">YouTube Channel Summaries</h1>
+        
+        <!-- Add Channel Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Add New Channel</h2>
+            <div class="flex gap-4">
+                <input type="text" id="channelUrl" placeholder="Enter YouTube channel URL" 
+                       class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="addChannel()" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                    Add Channel
+                </button>
+            </div>
+            <div id="errorMessage" class="text-red-500 mt-2 hidden"></div>
+        </div>
+
+        <!-- Channels List -->
+        <div id="channelsList" class="space-y-4">
+            <!-- Channels will be added here -->
+        </div>
+    </div>
+
+    <script>
+        // Load channels when page loads
+        document.addEventListener('DOMContentLoaded', loadChannels);
+
+        // Load all channels
+        async function loadChannels() {
+            try {
+                const response = await fetch('http://localhost:3000/api/channels');
+                const channels = await response.json();
+                
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = '';
+                
+                channels.forEach(channel => {
+                    const channelElement = createChannelElement(channel);
+                    channelsList.appendChild(channelElement);
+                });
+            } catch (error) {
+                console.error('Error loading channels:', error);
+                showError('Failed to load channels');
+            }
+        }
+
+        // Create channel element
+        function createChannelElement(channel) {
+            const div = document.createElement('div');
+            div.className = 'bg-white rounded-lg shadow-md p-6';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium">${channel.channelUrl}</h3>
+                    <button onclick="getLatestVideo('${channel.channelUrl}', this)" 
+                            class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                        Get Latest Video
+                    </button>
+                </div>
+                <div class="videos-container space-y-4">
+                    <!-- Videos will be added here -->
+                </div>
+            `;
+            return div;
+        }
+
+        // Add new channel
+        async function addChannel() {
+            const channelUrl = document.getElementById('channelUrl').value.trim();
+            if (!channelUrl) {
+                showError('Please enter a channel URL');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/api/channels', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ channelUrl })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('channelUrl').value = '';
+                    hideError();
+                    loadChannels();
+                } else {
+                    showError(data.error || 'Failed to add channel');
+                }
+            } catch (error) {
+                console.error('Error adding channel:', error);
+                showError('Failed to add channel');
+            }
+        }
+
+        // Get latest video for a channel
+        async function getLatestVideo(channelUrl, button) {
+            try {
+                button.disabled = true;
+                button.textContent = 'Loading...';
+                
+                const response = await fetch(`http://localhost:3000/api/channels/${encodeURIComponent(channelUrl)}/video`);
+                const data = await response.json();
+
+                if (response.ok && data) {
+                    const channelElement = button.closest('.bg-white');
+                    const videosContainer = channelElement.querySelector('.videos-container');
+                    
+                    // Add the new video at the top
+                    const videoElement = createVideoElement(data);
+                    videosContainer.insertBefore(videoElement, videosContainer.firstChild);
+                } else {
+                    showError(data.error || 'Error getting video summary');
+                }
+            } catch (error) {
+                console.error('Error getting video summary:', error);
+                showError('Error getting video summary');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Get Latest Video';
+            }
+        }
+
+        // Create video element
+        function createVideoElement(data) {
+            const div = document.createElement('div');
+            div.className = 'bg-gray-50 rounded-lg p-4';
+            
+            const formattedDate = data.publishedAt ? new Date(data.publishedAt).toLocaleDateString() : 'Date not available';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="text-lg font-medium">${data.title || 'No title available'}</h4>
+                    <span class="text-sm text-gray-500">${formattedDate}</span>
+                </div>
+                <div class="prose">
+                    ${data.summary || 'No summary available'}
+                </div>
+            `;
+            return div;
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+        }
+
+        // Hide error message
+        function hideError() {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.classList.add('hidden');
+        }
+    </script>
+</body>
+</html> 

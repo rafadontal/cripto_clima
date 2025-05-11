@@ -7,6 +7,9 @@ from openai import OpenAI
 from youtube_transcript_api import YouTubeTranscriptApi
 from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs
+from channels import CHANNELS
+from db import get_video_summary, save_video_summary, get_recent_channel_video
+from datetime import datetime
 
 # Load .env
 load_dotenv()
@@ -68,9 +71,9 @@ def get_latest_video_id(channel_url: str):
         print(f"Title: {video['snippet']['title']}")
         print(f"Published: {video['snippet']['publishedAt']}")
             
-        return video['id']['videoId']
+        return video['id']['videoId'], video['snippet']['title'], video['snippet']['publishedAt']
     except Exception as e:
-        return f"Error fetching videos from channel: {e}"
+        return f"Error fetching videos from channel: {e}", None, None
 
 
 def get_transcript(video_id: str):
@@ -99,29 +102,63 @@ def summarize_text(text: str, model: str = "gpt-4.1-mini"):
     except Exception as e:
         return f"Error calling OpenAI API: {e}"
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage:\n  python scraper/summarize_transcript.py <video_id | channel_url>")
-        sys.exit(1)
-
-    input_value = sys.argv[1]
-
-    if "youtube.com" in input_value:
-        print(f"\n🔎 Fetching latest video from channel: {input_value}")
-        video_id = get_latest_video_id(input_value)
+def process_channel(channel_url: str):
+    print(f"\n🔎 Processing channel: {channel_url}")
+    
+    # First check if we have a recent video in the database
+    recent_video = get_recent_channel_video(channel_url)
+    if recent_video:
+        print(f"\n📚 Found recent video in database:")
+        print(f"Title: {recent_video['video_title']}")
+        print(f"Published: {recent_video['published_at']}")
+        print("\nSummary:")
+        print(recent_video['summary'])
+        return
+    
+    # If no recent video found, proceed with YouTube API
+    result = get_latest_video_id(channel_url)
+    
+    if isinstance(result, tuple):
+        video_id, video_title, published_at = result
     else:
-        video_id = input_value
-
-    if "Error" in video_id:
-        print(video_id)
-        sys.exit(1)
-
+        print(result)
+        return
+    
+    # Check if video summary already exists in database
+    existing_summary = get_video_summary(video_id)
+    if existing_summary:
+        print(f"\n📚 Found existing summary for video: {video_title}")
+        print("\nSummary:")
+        print(existing_summary['summary'])
+        return
+    
     print(f"\n📼 Fetching transcript for video ID: {video_id}")
     transcript = get_transcript(video_id)
-
+    
     if "Error" in transcript:
         print(transcript)
     else:
         print("\n🧠 Generating summary...\n")
         summary = summarize_text(transcript)
         print(summary)
+        
+        # Save to database
+        video_data = {
+            "video_id": video_id,
+            "channel_url": channel_url,
+            "video_title": video_title,
+            "published_at": published_at,
+            "summary": summary,
+            "created_at": datetime.utcnow()
+        }
+        save_video_summary(video_data)
+        print("\n💾 Summary saved to database")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        # If a channel URL is provided as argument, process only that channel
+        process_channel(sys.argv[1])
+    else:
+        # Otherwise, process all channels from the list
+        for channel_url in CHANNELS:
+            process_channel(channel_url)
