@@ -3,167 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Channel Summaries</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>YouTube Summary App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8">YouTube Channel Summaries</h1>
-        
-        <!-- Add Channel Form -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">Add New Channel</h2>
-            <div class="flex gap-4">
-                <input type="text" id="channelUrl" placeholder="Enter YouTube channel URL" 
-                       class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="addChannel()" 
-                        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                    Add Channel
-                </button>
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">YouTube Summary App</h1>
+                </div>
+                <div class="flex items-center">
+                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Logout</button>
+                </div>
             </div>
-            <div id="errorMessage" class="text-red-500 mt-2 hidden"></div>
         </div>
+    </nav>
 
-        <!-- Channels List -->
-        <div id="channelsList" class="space-y-4">
-            <!-- Channels will be added here -->
+    <!-- Add Channel Modal -->
+    <div id="addChannelModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Channel</h3>
+                <div class="mt-2 px-7 py-3">
+                    <input type="text" id="channelUrl" placeholder="Enter YouTube channel URL" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex justify-end space-x-4 mt-4">
+                    <button id="cancelAddChannel" class="px-4 py-2 text-gray-500 hover:text-gray-700">Cancel</button>
+                    <button id="confirmAddChannel" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        Add Channel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="flex h-[calc(100vh-8rem)]">
+            <!-- Left Panel - Channel List -->
+            <div class="w-1/4 bg-white shadow rounded-lg p-4 mr-4 overflow-y-auto">
+                <div class="mb-4">
+                    <button id="addChannelButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Add Channel
+                    </button>
+                </div>
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Your Channels</h2>
+                <div id="channelsList" class="space-y-2">
+                    <!-- Channels will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Right Panel - Video Summaries -->
+            <div class="w-3/4 bg-white shadow rounded-lg p-4 overflow-y-auto">
+                <div id="videoContent" class="space-y-6">
+                    <div class="text-center text-gray-500 py-8">
+                        Select a channel to view its video summaries
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Load channels when page loads
-        document.addEventListener('DOMContentLoaded', loadChannels);
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
 
-        // Load all channels
-        async function loadChannels() {
+        // Helper function to extract channel handle
+        function getChannelHandle(channelUrl) {
             try {
-                const response = await fetch('http://localhost:3000/api/channels');
-                const channels = await response.json();
-                
-                const channelsList = document.getElementById('channelsList');
-                channelsList.innerHTML = '';
-                
-                channels.forEach(channel => {
-                    const channelElement = createChannelElement(channel);
-                    channelsList.appendChild(channelElement);
-                });
-            } catch (error) {
-                console.error('Error loading channels:', error);
-                showError('Failed to load channels');
+                const url = new URL(channelUrl);
+                const path = url.pathname;
+                if (path.includes('/@')) {
+                    return path.split('/@')[1];
+                }
+                return channelUrl;
+            } catch {
+                return channelUrl;
             }
         }
 
-        // Create channel element
-        function createChannelElement(channel) {
-            const div = document.createElement('div');
-            div.className = 'bg-white rounded-lg shadow-md p-6';
-            
-            div.innerHTML = `
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium">${channel.channelUrl}</h3>
-                    <button onclick="getLatestVideo('${channel.channelUrl}', this)" 
-                            class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
-                        Get Latest Video
-                    </button>
-                </div>
-                <div class="videos-container space-y-4">
-                    <!-- Videos will be added here -->
-                </div>
-            `;
-            return div;
-        }
+        // Modal handling
+        const modal = document.getElementById('addChannelModal');
+        const addChannelButton = document.getElementById('addChannelButton');
+        const cancelAddChannel = document.getElementById('cancelAddChannel');
+        const confirmAddChannel = document.getElementById('confirmAddChannel');
 
-        // Add new channel
-        async function addChannel() {
-            const channelUrl = document.getElementById('channelUrl').value.trim();
+        addChannelButton.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+
+        cancelAddChannel.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            document.getElementById('channelUrl').value = '';
+        });
+
+        // Logout handler
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+
+        // Add channel handler
+        confirmAddChannel.addEventListener('click', async () => {
+            const channelUrl = document.getElementById('channelUrl').value;
             if (!channelUrl) {
-                showError('Please enter a channel URL');
+                alert('Please enter a channel URL');
                 return;
             }
 
             try {
-                const response = await fetch('http://localhost:3000/api/channels', {
+                const response = await fetch('/api/channels', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({ channelUrl })
                 });
 
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     document.getElementById('channelUrl').value = '';
-                    hideError();
+                    modal.classList.add('hidden');
                     loadChannels();
                 } else {
-                    showError(data.error || 'Failed to add channel');
+                    alert(data.error || 'Failed to add channel');
                 }
             } catch (error) {
-                console.error('Error adding channel:', error);
-                showError('Failed to add channel');
+                console.error('Error:', error);
+                alert('An error occurred while adding the channel');
             }
-        }
+        });
 
-        // Get latest video for a channel
-        async function getLatestVideo(channelUrl, button) {
+        // Load channels
+        async function loadChannels() {
             try {
-                button.disabled = true;
-                button.textContent = 'Loading...';
-                
-                const response = await fetch(`http://localhost:3000/api/channels/${encodeURIComponent(channelUrl)}/video`);
-                const data = await response.json();
+                const response = await fetch('/api/channels', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
 
-                if (response.ok && data) {
-                    const channelElement = button.closest('.bg-white');
-                    const videosContainer = channelElement.querySelector('.videos-container');
-                    
-                    // Add the new video at the top
-                    const videoElement = createVideoElement(data);
-                    videosContainer.insertBefore(videoElement, videosContainer.firstChild);
-                } else {
-                    showError(data.error || 'Error getting video summary');
+                const channels = await response.json();
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = '';
+
+                for (const channel of channels) {
+                    const channelElement = document.createElement('div');
+                    channelElement.className = 'p-3 rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center';
+                    channelElement.innerHTML = `
+                        <span class="truncate">${getChannelHandle(channel.channelUrl)}</span>
+                        <button class="text-red-600 hover:text-red-900" onclick="event.stopPropagation(); removeChannel('${channel.channelUrl}')">
+                            Remove
+                        </button>
+                    `;
+                    channelElement.addEventListener('click', () => loadChannelVideos(channel.channelUrl));
+                    channelsList.appendChild(channelElement);
                 }
             } catch (error) {
-                console.error('Error getting video summary:', error);
-                showError('Error getting video summary');
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Get Latest Video';
+                console.error('Error:', error);
+                alert('An error occurred while loading channels');
             }
         }
 
-        // Create video element
-        function createVideoElement(data) {
-            const div = document.createElement('div');
-            div.className = 'bg-gray-50 rounded-lg p-4';
-            
-            const formattedDate = data.publishedAt ? new Date(data.publishedAt).toLocaleDateString() : 'Date not available';
-            
-            div.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="text-lg font-medium">${data.title || 'No title available'}</h4>
-                    <span class="text-sm text-gray-500">${formattedDate}</span>
-                </div>
-                <div class="prose">
-                    ${data.summary || 'No summary available'}
-                </div>
-            `;
-            return div;
+        // Remove channel
+        async function removeChannel(channelUrl) {
+            if (!confirm('Are you sure you want to remove this channel?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/channels/${encodeURIComponent(channelUrl)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    loadChannels();
+                    document.getElementById('videoContent').innerHTML = `
+                        <div class="text-center text-gray-500 py-8">
+                            Select a channel to view its video summaries
+                        </div>
+                    `;
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to remove channel');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while removing the channel');
+            }
         }
 
-        // Show error message
-        function showError(message) {
-            const errorElement = document.getElementById('errorMessage');
-            errorElement.textContent = message;
-            errorElement.classList.remove('hidden');
+        // Load channel videos
+        async function loadChannelVideos(channelUrl) {
+            const videoContent = document.getElementById('videoContent');
+            videoContent.innerHTML = '<div class="text-center text-gray-500 py-8">Loading...</div>';
+
+            try {
+                const response = await fetch(`/api/channels/${encodeURIComponent(channelUrl)}/videos?limit=5`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const videos = await response.json();
+
+                if (response.ok) {
+                    videoContent.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h3 class="text-xl font-medium text-gray-900">Recent Videos</h3>
+                                    <p class="text-sm text-gray-500">Channel: ${getChannelHandle(channelUrl)}</p>
+                                </div>
+                                <button class="text-indigo-600 hover:text-indigo-900" onclick="loadChannelVideos('${channelUrl}')">
+                                    Refresh
+                                </button>
+                            </div>
+                            ${videos.map(video => `
+                                <div class="bg-gray-50 rounded-lg p-6">
+                                    <h4 class="text-lg font-medium text-gray-900 mb-2">${video.title}</h4>
+                                    <p class="text-sm text-gray-500 mb-4">Published: ${new Date(video.publishedAt).toLocaleDateString()}</p>
+                                    <div class="prose max-w-none">
+                                        <h5 class="text-md font-medium text-gray-900 mb-2">Summary:</h5>
+                                        <p class="text-gray-700">${video.summary}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    videoContent.innerHTML = `<div class="text-center text-red-500 py-8">${videos.error || 'Failed to load videos'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                videoContent.innerHTML = '<div class="text-center text-red-500 py-8">An error occurred while loading the videos</div>';
+            }
         }
 
-        // Hide error message
-        function hideError() {
-            const errorElement = document.getElementById('errorMessage');
-            errorElement.classList.add('hidden');
-        }
+        // Load channels on page load
+        loadChannels();
     </script>
 </body>
 </html> 
