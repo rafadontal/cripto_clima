@@ -35,6 +35,7 @@ let db: any;
 let usersCollection: any;
 let channelsCollection: any;
 let videosCollection: any;
+let userVideoSummariesCollection: any;
 
 async function connectToMongo() {
   try {
@@ -45,6 +46,7 @@ async function connectToMongo() {
     usersCollection = db.collection('users');
     channelsCollection = db.collection('channels');
     videosCollection = db.collection('videos');
+    userVideoSummariesCollection = db.collection('user_video_summaries');
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
@@ -371,6 +373,142 @@ app.get('/api/channels/:channelUrl/videos', auth, async (req: AuthRequest, res: 
   }
 });
 
+// Get video ID from URL
+async function getVideoIdFromUrl(videoUrl: string): Promise<string | null> {
+  try {
+    const url = new URL(videoUrl);
+    const videoId = url.searchParams.get('v');
+    if (videoId) {
+      return videoId;
+    }
+
+    // Handle youtu.be URLs
+    if (url.hostname === 'youtu.be') {
+      return url.pathname.slice(1);
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing video URL:', error);
+    return null;
+  }
+}
+
+// Get video details from YouTube API
+async function getVideoDetails(videoId: string) {
+  try {
+    const response = await youtube.videos.list({
+      part: ['snippet'],
+      id: [videoId]
+    });
+
+    const video = response.data.items?.[0];
+    if (!video?.snippet) {
+      return null;
+    }
+
+    return {
+      videoId,
+      title: video.snippet.title,
+      publishedAt: video.snippet.publishedAt
+    };
+  } catch (error) {
+    console.error('Error getting video details:', error);
+    return null;
+  }
+}
+
+// Single video summary endpoint
+app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { videoUrl } = req.body;
+    if (!videoUrl) {
+      return res.status(400).json({ error: 'Video URL is required' });
+    }
+
+    const videoId = await getVideoIdFromUrl(videoUrl);
+    if (!videoId) {
+      return res.status(400).json({ error: 'Invalid YouTube video URL' });
+    }
+
+    // First check if we already have this summary in user's history
+    const existingUserSummary = await userVideoSummariesCollection.findOne({
+      userId: new ObjectId(req.user?.userId),
+      videoId
+    });
+
+    if (existingUserSummary) {
+      return res.json(existingUserSummary);
+    }
+
+    // Then check if we have this video in any channel
+    const existingChannelVideo = await videosCollection.findOne({
+      videoId
+    });
+
+    if (existingChannelVideo) {
+      // Create a copy in user's history
+      const videoSummary = {
+        userId: new ObjectId(req.user?.userId),
+        videoId,
+        title: existingChannelVideo.title,
+        publishedAt: existingChannelVideo.publishedAt,
+        summary: existingChannelVideo.summary,
+        createdAt: new Date()
+      };
+
+      await userVideoSummariesCollection.insertOne(videoSummary);
+      return res.json(videoSummary);
+    }
+
+    // If no existing summary found, get video details and generate new summary
+    const videoData = await getVideoDetails(videoId);
+    if (!videoData) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    // Generate summary
+    const summary = await generateSummary(videoId);
+    if (!summary) {
+      return res.status(500).json({ error: 'Failed to generate summary' });
+    }
+
+    // Save to database
+    const videoSummary = {
+      userId: new ObjectId(req.user?.userId),
+      videoId,
+      title: videoData.title,
+      publishedAt: videoData.publishedAt,
+      summary,
+      createdAt: new Date()
+    };
+
+    await userVideoSummariesCollection.insertOne(videoSummary);
+    res.json(videoSummary);
+  } catch (error) {
+    console.error('Error generating video summary:', error);
+    res.status(500).json({ error: 'Failed to generate video summary' });
+  }
+});
+
+// Get user's video summary history
+app.get('/api/videos/summaries', auth, async (req: AuthRequest, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 0;
+    const query = { userId: new ObjectId(req.user?.userId) };
+    const options = { 
+      sort: { createdAt: -1 },
+      ...(limit > 0 && { limit })
+    };
+
+    const summaries = await userVideoSummariesCollection.find(query, options).toArray();
+    res.json(summaries);
+  } catch (error) {
+    console.error('Error getting video summaries:', error);
+    res.status(500).json({ error: 'Failed to get video summaries' });
+  }
+});
+
 // Helper functions
 async function getChannelId(channelUrl: string): Promise<string | null> {
   try {
@@ -434,15 +572,25 @@ async function generateSummary(videoId: string): Promise<string | null> {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that summarizes YouTube videos and give insights into the video."
+          content: "You are a helpful assistant that summarizes YouTube videos and provides clear, structured insights."
         },
         {
           role: "user",
-          content: `Summarize the following YouTube transcript into 5 bullet points. If the video is talking about specific crypto tokens, please include the token names in the summary and if the sentiment is positive or negative, please include that in the summary.:\n\n${text}`
+          content: `Summarize the following YouTube video transcript. Focus on extracting the most important insights, main arguments, and conclusions. If the video includes any practical tips, actionable advice, step-by-step methods, or frameworks, list them clearly and concisely.
+
+Structure the output as follows:
+1. Summary – A concise overview of the video's key points.
+2. Key Insights – Bullet points of the most valuable takeaways or ideas.
+3. Actionable Advice / Practical Steps – Any recommended actions, strategies, or how-to instructions mentioned in the video.
+
+Please ensure the tone is neutral and informative, and avoid filler or repetition. Prioritize clarity and usefulness.
+
+Transcript:
+${text}`
         }
       ],
       temperature: 0.5,
-      max_tokens: 400
+      max_tokens: 800
     });
 
     return response.choices[0].message.content;

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Summary App</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <nav class="bg-white shadow-lg">
@@ -43,30 +44,160 @@
         <div class="flex h-[calc(100vh-8rem)]">
             <!-- Left Panel - Channel List -->
             <div class="w-1/4 bg-white shadow rounded-lg p-4 mr-4 overflow-y-auto">
-                <div class="mb-4">
+                <div class="space-y-4">
                     <button id="addChannelButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
                         Add Channel
                     </button>
-                </div>
-                <h2 class="text-lg font-medium text-gray-900 mb-4">Your Channels</h2>
-                <div id="channelsList" class="space-y-2">
-                    <!-- Channels will be added here dynamically -->
+
+                    <button id="summarizeVideoButton" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        Summarize Video
+                    </button>
+
+                    <button id="searchButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Search Summaries
+                    </button>
+
+                    <div class="border-t border-gray-200 pt-4">
+                        <h2 class="text-lg font-medium text-gray-900 mb-4">Your Channels</h2>
+                        <div id="channelsList" class="space-y-2">
+                            <!-- Channels will be added here dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-medium text-gray-900">Summary History</h2>
+                            <button id="viewAllSummaries" class="text-sm text-indigo-600 hover:text-indigo-900">View All</button>
+                        </div>
+                        <div id="summaryHistory" class="space-y-2">
+                            <!-- Summary history will be added here dynamically -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Right Panel - Video Summaries -->
             <div class="w-3/4 bg-white shadow rounded-lg p-4 overflow-y-auto">
                 <div id="videoContent" class="space-y-6">
-                    <div class="text-center text-gray-500 py-8">
-                        Select a channel to view its video summaries
+                    <!-- Video Input Section -->
+                    <div id="videoInputSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
+                        <h3 class="text-xl font-medium text-gray-900 mb-4">Summarize Video</h3>
+                        <div class="flex space-x-4">
+                            <input type="text" id="videoUrl" placeholder="Enter YouTube video URL" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button id="submitVideoButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center">
+                                <span id="submitButtonText">Summarize</span>
+                                <svg id="loadingSpinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Section -->
+                    <div id="searchSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
+                        <h3 class="text-xl font-medium text-gray-900 mb-4">Search Summaries</h3>
+                        <div class="flex space-x-4">
+                            <input type="text" id="searchInput" placeholder="Search in summaries..." 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <select id="searchType" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">All Summaries</option>
+                                <option value="history">History Only</option>
+                                <option value="channels">Channels Only</option>
+                            </select>
+                            <button id="searchSubmitButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                                Search
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="searchResults" class="space-y-4">
+                        <!-- Results will be added here dynamically -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Add a new modal for viewing all summaries -->
+    <div id="allSummariesModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-3/4 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-medium text-gray-900">All Summaries</h3>
+                <button id="closeAllSummaries" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="allSummariesList" class="space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
+                <!-- All summaries will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .markdown-content h1 {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 1em 0 0.5em 0;
+        }
+        .markdown-content h2 {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin: 1em 0 0.5em 0;
+        }
+        .markdown-content h3 {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin: 1em 0 0.5em 0;
+        }
+        .markdown-content p {
+            margin: 0.5em 0;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        .markdown-content li {
+            margin: 0.25em 0;
+        }
+        .markdown-content strong {
+            font-weight: bold;
+        }
+        .markdown-content em {
+            font-style: italic;
+        }
+        .markdown-content code {
+            background-color: #f3f4f6;
+            padding: 0.2em 0.4em;
+            border-radius: 0.25em;
+            font-family: monospace;
+        }
+        .markdown-content pre {
+            background-color: #f3f4f6;
+            padding: 1em;
+            border-radius: 0.25em;
+            overflow-x: auto;
+        }
+        .markdown-content blockquote {
+            border-left: 4px solid #e5e7eb;
+            padding-left: 1em;
+            margin: 1em 0;
+            color: #4b5563;
+        }
+    </style>
 
     <script>
         // Check authentication
@@ -90,17 +221,17 @@
         }
 
         // Modal handling
-        const modal = document.getElementById('addChannelModal');
+        const channelModal = document.getElementById('addChannelModal');
         const addChannelButton = document.getElementById('addChannelButton');
         const cancelAddChannel = document.getElementById('cancelAddChannel');
         const confirmAddChannel = document.getElementById('confirmAddChannel');
 
         addChannelButton.addEventListener('click', () => {
-            modal.classList.remove('hidden');
+            channelModal.classList.remove('hidden');
         });
 
         cancelAddChannel.addEventListener('click', () => {
-            modal.classList.add('hidden');
+            channelModal.classList.add('hidden');
             document.getElementById('channelUrl').value = '';
         });
 
@@ -132,7 +263,7 @@
 
                 if (response.ok) {
                     document.getElementById('channelUrl').value = '';
-                    modal.classList.add('hidden');
+                    channelModal.classList.add('hidden');
                     loadChannels();
                 } else {
                     alert(data.error || 'Failed to add channel');
@@ -140,6 +271,255 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('An error occurred while adding the channel');
+            }
+        });
+
+        // Update the summarize video button handler
+        document.getElementById('summarizeVideoButton').addEventListener('click', () => {
+            const videoInputSection = document.getElementById('videoInputSection');
+            const searchSection = document.getElementById('searchSection');
+            const searchResults = document.getElementById('searchResults');
+            
+            videoInputSection.classList.remove('hidden');
+            searchSection.classList.add('hidden');
+            searchResults.innerHTML = '';
+        });
+
+        // Update the submit video button handler
+        const submitButton = document.getElementById('submitVideoButton');
+        const submitButtonText = document.getElementById('submitButtonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        submitButton.addEventListener('click', async () => {
+            const url = document.getElementById('videoUrl').value;
+            if (!url) {
+                alert('Please enter a video URL');
+                return;
+            }
+
+            // Disable button and show loading state
+            submitButton.disabled = true;
+            submitButtonText.textContent = 'Processing...';
+            loadingSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/videos/summary', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ videoUrl: url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('videoUrl').value = '';
+                    loadSummaryHistory();
+                    displaySummary(data);
+                } else {
+                    alert(data.error || 'Failed to generate summary');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while generating the summary');
+            } finally {
+                // Re-enable button and hide loading state
+                submitButton.disabled = false;
+                submitButtonText.textContent = 'Summarize';
+                loadingSpinner.classList.add('hidden');
+            }
+        });
+
+        // Update the view all summaries handler
+        document.getElementById('viewAllSummaries').addEventListener('click', async () => {
+            try {
+                console.log('Fetching all summaries...');
+                const response = await fetch('/api/videos/summaries', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Server error:', errorData);
+                    throw new Error(errorData.error || 'Failed to fetch summaries');
+                }
+
+                const summaries = await response.json();
+                console.log('Received summaries:', summaries);
+
+                // Hide other sections
+                document.getElementById('videoInputSection').classList.add('hidden');
+                document.getElementById('searchSection').classList.add('hidden');
+                
+                const searchResults = document.getElementById('searchResults');
+                searchResults.innerHTML = `
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                        <div class="flex space-x-4">
+                            <input type="text" id="allSummariesSearch" placeholder="Search in all summaries..." 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button id="allSummariesSearchButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                    <div id="allSummariesList" class="space-y-4">
+                    </div>
+                `;
+
+                const allSummariesList = document.getElementById('allSummariesList');
+                allSummariesList.innerHTML = '';
+
+                if (!Array.isArray(summaries) || summaries.length === 0) {
+                    console.log('No summaries found');
+                    allSummariesList.innerHTML = '<div class="text-center text-gray-500 py-4">No summaries found</div>';
+                    return;
+                }
+
+                console.log('Displaying summaries...');
+                for (const summary of summaries) {
+                    const summaryElement = document.createElement('div');
+                    summaryElement.className = 'bg-gray-50 rounded-lg p-6 cursor-pointer hover:bg-gray-100';
+                    summaryElement.innerHTML = `
+                        <h4 class="text-lg font-medium text-gray-900 mb-2">${summary.title}</h4>
+                        <p class="text-sm text-gray-500 mb-4">Created: ${new Date(summary.createdAt).toLocaleDateString()}</p>
+                        <div class="prose max-w-none">
+                            <p class="text-gray-700">${summary.summary}</p>
+                        </div>
+                    `;
+                    summaryElement.addEventListener('click', () => {
+                        console.log('Summary clicked:', summary);
+                        displaySummary(summary);
+                    });
+                    allSummariesList.appendChild(summaryElement);
+                }
+
+                // Add search functionality for all summaries
+                const searchButton = document.getElementById('allSummariesSearchButton');
+                if (searchButton) {
+                    searchButton.addEventListener('click', () => {
+                        const searchTerm = document.getElementById('allSummariesSearch').value.toLowerCase();
+                        console.log('Searching with term:', searchTerm);
+                        const filteredSummaries = summaries.filter(summary => 
+                            summary.title.toLowerCase().includes(searchTerm) ||
+                            summary.summary.toLowerCase().includes(searchTerm)
+                        );
+                        
+                        allSummariesList.innerHTML = '';
+                        if (filteredSummaries.length === 0) {
+                            allSummariesList.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
+                            return;
+                        }
+
+                        filteredSummaries.forEach(summary => {
+                            const summaryElement = document.createElement('div');
+                            summaryElement.className = 'bg-gray-50 rounded-lg p-6 cursor-pointer hover:bg-gray-100';
+                            const parsedSummary = marked.parse(summary.summary);
+                            summaryElement.innerHTML = `
+                                <h4 class="text-lg font-medium text-gray-900 mb-2">${highlightText(summary.title, searchTerm)}</h4>
+                                <p class="text-sm text-gray-500 mb-4">Created: ${new Date(summary.createdAt).toLocaleDateString()}</p>
+                                <div class="prose max-w-none">
+                                    <div class="markdown-content">${highlightText(parsedSummary, searchTerm)}</div>
+                                </div>
+                            `;
+                            summaryElement.addEventListener('click', () => {
+                                console.log('Filtered summary clicked:', summary);
+                                displaySummary(summary);
+                            });
+                            allSummariesList.appendChild(summaryElement);
+                        });
+                    });
+                } else {
+                    console.error('Search button not found');
+                }
+            } catch (error) {
+                console.error('Error in viewAllSummaries:', error);
+                alert(`Error loading summaries: ${error.message}`);
+            }
+        });
+
+        // Update the search button handler
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const videoInputSection = document.getElementById('videoInputSection');
+            const searchSection = document.getElementById('searchSection');
+            const searchResults = document.getElementById('searchResults');
+            
+            videoInputSection.classList.add('hidden');
+            searchSection.classList.remove('hidden');
+            searchResults.innerHTML = '';
+        });
+
+        // Update the search submit handler
+        document.getElementById('searchSubmitButton').addEventListener('click', async () => {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const type = document.getElementById('searchType').value;
+            
+            if (!searchTerm) {
+                alert('Please enter a search term');
+                return;
+            }
+
+            try {
+                let summaries = [];
+                
+                if (type === 'all' || type === 'history') {
+                    const historyResponse = await fetch('/api/videos/summaries', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const historyData = await historyResponse.json();
+                    summaries = summaries.concat(historyData);
+                }
+                
+                if (type === 'all' || type === 'channels') {
+                    const channelsResponse = await fetch('/api/channels', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const channels = await channelsResponse.json();
+                    
+                    for (const channel of channels) {
+                        const videosResponse = await fetch(`/api/channels/${encodeURIComponent(channel.channelUrl)}/videos?limit=5`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const videos = await videosResponse.json();
+                        summaries = summaries.concat(videos);
+                    }
+                }
+
+                // Filter summaries based on search term
+                const filteredSummaries = summaries.filter(summary => 
+                    summary.title.toLowerCase().includes(searchTerm) ||
+                    summary.summary.toLowerCase().includes(searchTerm)
+                );
+
+                // Display results with highlighted search terms
+                const searchResults = document.getElementById('searchResults');
+                searchResults.innerHTML = '';
+
+                if (filteredSummaries.length === 0) {
+                    searchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
+                    return;
+                }
+
+                filteredSummaries.forEach(summary => {
+                    const summaryElement = document.createElement('div');
+                    summaryElement.className = 'bg-gray-50 rounded-lg p-6 cursor-pointer hover:bg-gray-100';
+                    const parsedSummary = marked.parse(summary.summary);
+                    summaryElement.innerHTML = `
+                        <h4 class="text-lg font-medium text-gray-900 mb-2">${highlightText(summary.title, searchTerm)}</h4>
+                        <p class="text-sm text-gray-500 mb-4">Published: ${new Date(summary.publishedAt).toLocaleDateString()}</p>
+                        <div class="prose max-w-none">
+                            <div class="markdown-content">${highlightText(parsedSummary, searchTerm)}</div>
+                        </div>
+                    `;
+                    summaryElement.addEventListener('click', () => displaySummary(summary));
+                    searchResults.appendChild(summaryElement);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while searching summaries');
             }
         });
 
@@ -207,8 +587,35 @@
 
         // Load channel videos
         async function loadChannelVideos(channelUrl) {
+            console.log('Loading channel videos for:', channelUrl);
             const videoContent = document.getElementById('videoContent');
-            videoContent.innerHTML = '<div class="text-center text-gray-500 py-8">Loading...</div>';
+            if (!videoContent) {
+                console.error('Video content element not found');
+                return;
+            }
+
+            // Hide other sections
+            document.getElementById('videoInputSection').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+
+            // Update the search results section for channel videos
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = `
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xl font-medium text-gray-900">Recent Videos</h3>
+                            <p class="text-sm text-gray-500">Channel: ${getChannelHandle(channelUrl)}</p>
+                        </div>
+                        <button class="text-indigo-600 hover:text-indigo-900" onclick="loadChannelVideos('${channelUrl}')">
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="channelVideosList" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">Loading...</div>
+                    </div>
+                </div>
+            `;
 
             try {
                 const response = await fetch(`/api/channels/${encodeURIComponent(channelUrl)}/videos?limit=5`, {
@@ -217,43 +624,145 @@
                     }
                 });
 
-                const videos = await response.json();
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Server error:', errorData);
+                    throw new Error(errorData.error || 'Failed to fetch channel videos');
+                }
 
-                if (response.ok) {
-                    videoContent.innerHTML = `
-                        <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <h3 class="text-xl font-medium text-gray-900">Recent Videos</h3>
-                                    <p class="text-sm text-gray-500">Channel: ${getChannelHandle(channelUrl)}</p>
-                                </div>
-                                <button class="text-indigo-600 hover:text-indigo-900" onclick="loadChannelVideos('${channelUrl}')">
-                                    Refresh
-                                </button>
+                const videos = await response.json();
+                console.log('Received channel videos:', videos);
+
+                const channelVideosList = document.getElementById('channelVideosList');
+                if (!channelVideosList) {
+                    console.error('Channel videos list element not found');
+                    return;
+                }
+
+                if (!Array.isArray(videos) || videos.length === 0) {
+                    console.log('No videos found for channel');
+                    channelVideosList.innerHTML = '<div class="text-center text-gray-500 py-8">No videos found for this channel</div>';
+                    return;
+                }
+
+                channelVideosList.innerHTML = videos.map(video => {
+                    const parsedSummary = marked.parse(video.summary);
+                    return `
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">${video.title}</h4>
+                            <p class="text-sm text-gray-500 mb-4">Published: ${new Date(video.publishedAt).toLocaleDateString()}</p>
+                            <div class="prose max-w-none">
+                                <div class="markdown-content">${parsedSummary}</div>
                             </div>
-                            ${videos.map(video => `
-                                <div class="bg-gray-50 rounded-lg p-6">
-                                    <h4 class="text-lg font-medium text-gray-900 mb-2">${video.title}</h4>
-                                    <p class="text-sm text-gray-500 mb-4">Published: ${new Date(video.publishedAt).toLocaleDateString()}</p>
-                                    <div class="prose max-w-none">
-                                        <h5 class="text-md font-medium text-gray-900 mb-2">Summary:</h5>
-                                        <p class="text-gray-700">${video.summary}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
                         </div>
                     `;
-                } else {
-                    videoContent.innerHTML = `<div class="text-center text-red-500 py-8">${videos.error || 'Failed to load videos'}</div>`;
-                }
+                }).join('');
             } catch (error) {
-                console.error('Error:', error);
-                videoContent.innerHTML = '<div class="text-center text-red-500 py-8">An error occurred while loading the videos</div>';
+                console.error('Error in loadChannelVideos:', error);
+                const channelVideosList = document.getElementById('channelVideosList');
+                if (channelVideosList) {
+                    channelVideosList.innerHTML = `<div class="text-center text-red-500 py-8">Error: ${error.message}</div>`;
+                }
             }
         }
 
-        // Load channels on page load
+        // Load summary history
+        async function loadSummaryHistory() {
+            try {
+                console.log('Loading summary history...');
+                const response = await fetch('/api/videos/summaries?limit=3', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Server error:', errorData);
+                    throw new Error(errorData.error || 'Failed to fetch summary history');
+                }
+
+                const summaries = await response.json();
+                console.log('Received summary history:', summaries);
+
+                const summaryHistory = document.getElementById('summaryHistory');
+                if (!summaryHistory) {
+                    console.error('Summary history element not found');
+                    return;
+                }
+
+                summaryHistory.innerHTML = '';
+
+                if (!Array.isArray(summaries) || summaries.length === 0) {
+                    console.log('No summary history found');
+                    summaryHistory.innerHTML = '<div class="text-center text-gray-500 py-4">No summary history</div>';
+                    return;
+                }
+
+                for (const summary of summaries) {
+                    const summaryElement = document.createElement('div');
+                    summaryElement.className = 'p-3 rounded-lg hover:bg-gray-50 cursor-pointer';
+                    summaryElement.innerHTML = `
+                        <div class="text-sm font-medium text-gray-900 truncate">${summary.title}</div>
+                        <div class="text-xs text-gray-500">${new Date(summary.createdAt).toLocaleDateString()}</div>
+                    `;
+                    summaryElement.addEventListener('click', () => {
+                        console.log('Summary history item clicked:', summary);
+                        document.getElementById('videoInputSection').classList.add('hidden');
+                        document.getElementById('searchSection').classList.add('hidden');
+                        document.getElementById('searchResults').innerHTML = '';
+                        displaySummary(summary);
+                    });
+                    summaryHistory.appendChild(summaryElement);
+                }
+            } catch (error) {
+                console.error('Error in loadSummaryHistory:', error);
+                alert(`Error loading summary history: ${error.message}`);
+            }
+        }
+
+        // Add functions for handling all summaries modal
+        const allSummariesModal = document.getElementById('allSummariesModal');
+        const closeAllSummaries = document.getElementById('closeAllSummaries');
+        const allSummariesList = document.getElementById('allSummariesList');
+
+        closeAllSummaries.addEventListener('click', () => {
+            allSummariesModal.classList.add('hidden');
+        });
+
+        // Load initial data
         loadChannels();
+        loadSummaryHistory();
+
+        // Helper function to highlight search terms
+        function highlightText(text, searchTerm) {
+            if (!searchTerm) return text;
+            const regex = new RegExp(`(${searchTerm})`, 'gi');
+            return text.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
+        }
+
+        // Update the displaySummary function
+        function displaySummary(summary) {
+            console.log('Displaying summary:', summary);
+            const searchResults = document.getElementById('searchResults');
+            if (!searchResults) {
+                console.error('Search results element not found');
+                return;
+            }
+
+            // Parse markdown in the summary
+            const parsedSummary = marked.parse(summary.summary);
+
+            searchResults.innerHTML = `
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <h4 class="text-lg font-medium text-gray-900 mb-2">${summary.title}</h4>
+                    <p class="text-sm text-gray-500 mb-4">Published: ${new Date(summary.publishedAt).toLocaleDateString()}</p>
+                    <div class="prose max-w-none">
+                        <div class="markdown-content">${parsedSummary}</div>
+                    </div>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html> 
