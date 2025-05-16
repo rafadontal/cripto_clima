@@ -25,6 +25,7 @@ export interface Video {
   publishedAt: string;
   summary: string;
   createdAt: Date;
+  profilePictureUrl?: string | null;
 }
 
 export interface AuthRequest extends Request {

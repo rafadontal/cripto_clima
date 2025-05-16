@@ -67,7 +67,10 @@
                     </button>
 
                     <div class="border-t border-gray-200 pt-4">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Your Channels</h2>
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-medium text-gray-900">Your Channels</h2>
+                            <button id="viewAllChannels" class="text-sm text-indigo-600 hover:text-indigo-900">View All</button>
+                        </div>
                         <div id="channelsList" class="space-y-2">
                             <!-- Channels will be added here dynamically -->
                         </div>
@@ -538,9 +541,12 @@
 
                 for (const channel of channels) {
                     const channelElement = document.createElement('div');
-                    channelElement.className = 'p-3 rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center';
+                    channelElement.className = 'p-3 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center space-x-3';
                     channelElement.innerHTML = `
-                        <span class="truncate">${getChannelHandle(channel.channelUrl)}</span>
+                        <img src="${channel.profilePictureUrl || 'https://via.placeholder.com/40'}" 
+                             alt="${getChannelHandle(channel.channelUrl)}" 
+                             class="w-10 h-10 rounded-full">
+                        <span class="truncate flex-1">${getChannelHandle(channel.channelUrl)}</span>
                         <button class="text-red-600 hover:text-red-900" onclick="event.stopPropagation(); removeChannel('${channel.channelUrl}')">
                             Remove
                         </button>
@@ -647,12 +653,27 @@
 
                 channelVideosList.innerHTML = videos.map(video => {
                     const parsedSummary = marked.parse(video.summary);
+                    const channelHandle = getChannelHandle(channelUrl);
+                    const initials = getInitials(channelHandle);
                     return `
                         <div class="bg-gray-50 rounded-lg p-6">
-                            <h4 class="text-lg font-medium text-gray-900 mb-2">${video.title}</h4>
-                            <p class="text-sm text-gray-500 mb-4">Published: ${new Date(video.publishedAt).toLocaleDateString()}</p>
+                            <div class="flex items-center space-x-3 mb-4">
+                                ${video.profilePictureUrl ? 
+                                    `<img src="${video.profilePictureUrl}" 
+                                          alt="${channelHandle}" 
+                                          class="w-10 h-10 rounded-full object-cover"
+                                          onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium\'>${initials}</div>';">` :
+                                    `<div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">${initials}</div>`
+                                }
+                                <div>
+                                    <h4 class="text-lg font-medium text-gray-900">${video.title}</h4>
+                                    <p class="text-sm text-gray-500">
+                                        ${channelHandle} • 
+                                        ${new Date(video.publishedAt).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
                             <div class="prose max-w-none">
-                                <h5 class="text-md font-medium text-gray-900 mb-2">Summary:</h5>
                                 <div class="markdown-content">${parsedSummary}</div>
                             </div>
                         </div>
@@ -734,6 +755,7 @@
         // Load initial data
         loadChannels();
         loadSummaryHistory();
+        loadFeed();
 
         // Helper function to highlight search terms
         function highlightText(text, searchTerm) {
@@ -764,6 +786,91 @@
                 </div>
             `;
         }
+
+        // Add helper function for getting initials
+        function getInitials(text) {
+            return text
+                .split(/[@\s]/)
+                .filter(word => word.length > 0)
+                .map(word => word[0].toUpperCase())
+                .slice(0, 2)
+                .join('');
+        }
+
+        // Update the loadFeed function
+        async function loadFeed() {
+            try {
+                const response = await fetch('/api/feed', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch feed');
+                }
+
+                const videos = await response.json();
+                const searchResults = document.getElementById('searchResults');
+                
+                // Hide other sections
+                document.getElementById('videoInputSection').classList.add('hidden');
+                document.getElementById('searchSection').classList.add('hidden');
+
+                if (!Array.isArray(videos) || videos.length === 0) {
+                    searchResults.innerHTML = '<div class="text-center text-gray-500 py-8">No videos found in your feed</div>';
+                    return;
+                }
+
+                searchResults.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-medium text-gray-900">Latest Videos</h3>
+                            <button class="text-indigo-600 hover:text-indigo-900" onclick="loadFeed()">
+                                Refresh
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            ${videos.map(video => {
+                                const channelHandle = getChannelHandle(video.channelUrl);
+                                const initials = getInitials(channelHandle);
+                                return `
+                                    <div class="bg-gray-50 rounded-lg p-6">
+                                        <div class="flex items-center space-x-3 mb-4">
+                                            ${video.profilePictureUrl ? 
+                                                `<img src="${video.profilePictureUrl}" 
+                                                      alt="${channelHandle}" 
+                                                      class="w-10 h-10 rounded-full object-cover"
+                                                      onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium\'>${initials}</div>';">` :
+                                                `<div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">${initials}</div>`
+                                            }
+                                            <div>
+                                                <h4 class="text-lg font-medium text-gray-900">${video.title}</h4>
+                                                <p class="text-sm text-gray-500">
+                                                    ${channelHandle} • 
+                                                    ${new Date(video.publishedAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="prose max-w-none">
+                                            <div class="markdown-content">${marked.parse(video.summary)}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while loading the feed');
+            }
+        }
+
+        // Update the view all channels handler
+        document.getElementById('viewAllChannels').addEventListener('click', () => {
+            loadFeed();
+        });
     </script>
 </body>
 </html> 

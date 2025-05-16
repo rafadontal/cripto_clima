@@ -183,16 +183,47 @@ app.post('/api/channels', auth_1.auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to add channel' });
     }
 });
+// Update the channels endpoint to include profile picture
 app.get('/api/channels', auth_1.auth, async (req, res) => {
     try {
         const channels = await channelsCollection.find({
             userId: new mongodb_1.ObjectId(req.user?.userId)
         }).toArray();
-        res.json(channels);
+        // Get channel info including profile pictures
+        const channelsWithInfo = await Promise.all(channels.map(async (channel) => {
+            try {
+                // Get the channel ID first
+                const channelId = await getChannelId(channel.channelUrl);
+                if (!channelId) {
+                    console.error('Could not get channel ID for:', channel.channelUrl);
+                    return {
+                        ...channel,
+                        profilePictureUrl: null
+                    };
+                }
+                const response = await youtube.channels.list({
+                    part: ['snippet'],
+                    id: [channelId]
+                });
+                const channelInfo = response.data.items?.[0];
+                return {
+                    ...channel,
+                    profilePictureUrl: channelInfo?.snippet?.thumbnails?.default?.url || null
+                };
+            }
+            catch (error) {
+                console.error('Error fetching channel info:', error);
+                return {
+                    ...channel,
+                    profilePictureUrl: null
+                };
+            }
+        }));
+        res.json(channelsWithInfo);
     }
     catch (error) {
-        console.error('Error getting channels:', error);
-        res.status(500).json({ error: 'Failed to get channels' });
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Failed to fetch channels' });
     }
 });
 app.delete('/api/channels/:channelUrl', auth_1.auth, async (req, res) => {
@@ -517,6 +548,100 @@ ${text}`
         return null;
     }
 }
+// Add new endpoint for the feed
+app.get('/api/feed', auth_1.auth, async (req, res) => {
+    try {
+        // Get all channels for the user
+        const channels = await channelsCollection.find({
+            userId: new mongodb_1.ObjectId(req.user?.userId)
+        }).toArray();
+        // Get the latest video from each channel
+        const latestVideos = await Promise.all(channels.map(async (channel) => {
+            try {
+                // First check if we have recent videos in the database
+                const recentVideos = await videosCollection.find({ channelUrl: channel.channelUrl }, { sort: { createdAt: -1 }, limit: 1 }).toArray();
+                if (recentVideos.length > 0) {
+                    const lastVideo = recentVideos[0];
+                    const lastUpdate = new Date(lastVideo.createdAt);
+                    const now = new Date();
+                    const hoursSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+                    // If the last update was less than 6 hours ago, use the cached version
+                    if (hoursSinceUpdate < 6) {
+                        return lastVideo;
+                    }
+                }
+                // Get the channel ID first
+                const channelId = await getChannelId(channel.channelUrl);
+                if (!channelId) {
+                    console.error('Could not get channel ID for:', channel.channelUrl);
+                    return null;
+                }
+                // If no recent videos or cache expired, fetch from YouTube
+                const response = await youtube.search.list({
+                    part: ['snippet'],
+                    channelId: channelId,
+                    order: 'date',
+                    maxResults: 1,
+                    type: ['video']
+                });
+                const video = response.data.items?.[0];
+                if (!video?.id?.videoId)
+                    return null;
+                // Check if we already have this video in the database
+                const existingVideo = await videosCollection.findOne({
+                    channelUrl: channel.channelUrl,
+                    videoId: video.id.videoId
+                });
+                if (existingVideo) {
+                    return existingVideo;
+                }
+                // If not in database, generate summary and save
+                const videoDetails = await youtube.videos.list({
+                    part: ['snippet', 'contentDetails'],
+                    id: [video.id.videoId]
+                });
+                const videoInfo = videoDetails.data.items?.[0];
+                if (!videoInfo?.snippet?.title || !videoInfo?.snippet?.publishedAt)
+                    return null;
+                const summary = await generateSummary(video.id.videoId);
+                if (!summary)
+                    return null;
+                // Get channel profile picture
+                const channelResponse = await youtube.channels.list({
+                    part: ['snippet'],
+                    id: [channelId]
+                });
+                const channelInfo = channelResponse.data.items?.[0];
+                const profilePictureUrl = channelInfo?.snippet?.thumbnails?.default?.url || null;
+                // Save to database
+                const videoInfoToSave = {
+                    channelUrl: channel.channelUrl,
+                    videoId: video.id.videoId,
+                    title: videoInfo.snippet.title,
+                    publishedAt: videoInfo.snippet.publishedAt,
+                    summary,
+                    createdAt: new Date(),
+                    profilePictureUrl
+                };
+                await videosCollection.insertOne(videoInfoToSave);
+                return videoInfoToSave;
+            }
+            catch (error) {
+                console.error('Error fetching channel videos:', error);
+                return null;
+            }
+        }));
+        // Filter out null values and sort by publish date
+        const validVideos = latestVideos
+            .filter((video) => video !== null)
+            .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+        res.json(validVideos);
+    }
+    catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Failed to fetch feed' });
+    }
+});
 // Start server
 connectToMongo().then(() => {
     app.listen(port, () => {
