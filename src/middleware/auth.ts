@@ -1,21 +1,45 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../types';
+import { MongoClient, Collection, ObjectId } from 'mongodb';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// Define JWT payload type
+interface JWTPayload {
+    userId: string;
+    email: string;
+}
 
-export const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+let usersCollection: Collection;
 
+export function setUsersCollection(collection: Collection) {
+    usersCollection = collection;
+}
+
+export async function auth(req: Request, res: Response, next: NextFunction) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
     if (!token) {
-      throw new Error();
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Please authenticate' });
-  }
-}; 
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JWTPayload;
+        (req as AuthRequest).user = decoded;
+
+        // Check subscription status for API routes
+        if (req.path.startsWith('/api/') && !req.path.startsWith('/api/subscription/')) {
+            const user = await usersCollection.findOne({ _id: new ObjectId(decoded.userId) });
+            if (!user || user.subscriptionStatus === 'unpaid') {
+                return res.status(403).json({ 
+                    error: 'Subscription required',
+                    redirectTo: '/landing.html'
+                });
+            }
+        }
+
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+} 

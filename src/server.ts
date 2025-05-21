@@ -8,10 +8,21 @@ import { YoutubeTranscript } from 'youtube-transcript';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { auth } from './middleware/auth';
+import { auth, setUsersCollection } from './middleware/auth';
 import { AuthRequest, User, Channel, Video } from './types';
+import { SUBSCRIPTION_PLANS, STRIPE_CONFIG } from './config';
+import Stripe from 'stripe';
+import { getStripeConfig } from './config';
 
-dotenv.config();
+// Load environment variables with override
+dotenv.config({ override: true });
+
+// Debug: Log all environment variables (safely)
+console.log('Environment variables loaded:');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
+console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
+console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,7 +38,8 @@ const oauth2Client = new google.auth.OAuth2(
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+
+// API routes should be defined BEFORE static file serving
 
 // MongoDB connection
 let client: MongoClient;
@@ -47,6 +59,9 @@ async function connectToMongo() {
     channelsCollection = db.collection('channels');
     videosCollection = db.collection('videos');
     userVideoSummariesCollection = db.collection('user_video_summaries');
+    
+    // Set users collection in auth middleware
+    setUsersCollection(usersCollection);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
@@ -63,6 +78,14 @@ const youtube = google.youtube({
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Initialize Stripe
+const stripe = new Stripe(getStripeConfig().secretKey, {
+    apiVersion: '2025-04-30.basil'
+});
+
+// Debug: Log the first few characters of the key being used
+console.log('Stripe key being used (first 8 chars):', getStripeConfig().secretKey.substring(0, 8));
 
 // Google OAuth Routes
 app.get('/api/auth/google/url', (req: Request, res: Response) => {
@@ -109,7 +132,9 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
         email: data.email,
         name: data.name || '',
         googleId: data.id || undefined,
-        createdAt: new Date()
+        createdAt: new Date(),
+        tier: 'basic',
+        subscriptionStatus: 'unpaid'
       };
       
       const result = await usersCollection.insertOne(newUser);
@@ -147,7 +172,9 @@ app.post('/api/register', async (req: Request, res: Response) => {
     const user: User = {
       email,
       password: hashedPassword,
-      createdAt: new Date()
+      createdAt: new Date(),
+      tier: 'basic',
+      subscriptionStatus: 'unpaid'
     };
 
     const result = await usersCollection.insertOne(user);
@@ -177,6 +204,16 @@ app.post('/api/login', async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign({ userId: user._id.toString(), email }, JWT_SECRET);
+    
+    // If user is unpaid, return subscription required
+    if (user.subscriptionStatus === 'unpaid') {
+      return res.json({ 
+        token,
+        subscriptionRequired: true,
+        redirectTo: '/landing.html'
+      });
+    }
+
     res.json({ token });
   } catch (error) {
     console.error('Error logging in:', error);
@@ -751,6 +788,172 @@ app.get('/api/feed', auth, async (req: AuthRequest, res: Response) => {
         res.status(500).json({ error: 'Failed to fetch feed' });
     }
 });
+
+// Get subscription plans
+app.get('/api/subscription/plans', (req: Request, res: Response) => {
+    res.json(SUBSCRIPTION_PLANS);
+});
+
+// Serve landing page as default
+app.get('/', (req: Request, res: Response) => {
+    res.sendFile(path.join(__dirname, '../public/landing.html'));
+});
+
+// Create subscription checkout session
+app.post('/api/subscription/create-checkout', auth, async (req: AuthRequest, res: Response) => {
+    try {
+        const { planId } = req.body;
+        const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+        
+        if (!plan) {
+            return res.status(400).json({ error: 'Invalid plan' });
+        }
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Return the pre-created payment link
+        res.json({ url: plan.paymentLink });
+    } catch (error) {
+        console.error('Error getting payment link:', error);
+        res.status(500).json({ error: 'Failed to get payment link' });
+    }
+});
+
+// Get user's usage statistics
+app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
+    console.log('User in /api/account/usage:', req.user);
+    try {
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const plan = SUBSCRIPTION_PLANS.find(p => p.tier === user.tier);
+        if (!plan) {
+            return res.status(404).json({ error: 'Plan not found' });
+        }
+
+        // Get current month's start date
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Count channels
+        const channelsCount = await channelsCollection.countDocuments({
+            userId: new ObjectId(req.user?.userId)
+        });
+
+        // Count videos this month
+        const videosThisMonth = await videosCollection.countDocuments({
+            userId: new ObjectId(req.user?.userId),
+            createdAt: { $gte: startOfMonth }
+        });
+
+        res.json({
+            channelsCount,
+            videosThisMonth,
+            maxChannels: plan.maxChannels,
+            maxVideosPerMonth: plan.maxVideosPerMonth,
+            tier: user.tier,
+            subscriptionStatus: user.subscriptionStatus,
+            nextBillingDate: user.currentPeriodEnd
+        });
+    } catch (error) {
+        console.error('Error getting usage statistics:', error);
+        res.status(500).json({ error: 'Failed to get usage statistics' });
+    }
+});
+
+// Stripe webhook handler
+app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    if (!stripe) {
+        return res.status(503).json({ error: 'Subscription service is currently unavailable' });
+    }
+    const sig = req.headers['stripe-signature'];
+
+    try {
+        const event = stripe.webhooks.constructEvent(
+            req.body,
+            sig as string,
+            getStripeConfig().webhookSecret
+        );
+
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object as Stripe.Checkout.Session;
+                const userId = session.metadata?.userId;
+                const planId = session.metadata?.planId;
+
+                if (!userId || !planId) {
+                    throw new Error('Missing metadata');
+                }
+
+                const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+                if (!plan) {
+                    throw new Error('Invalid plan');
+                }
+
+                await usersCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    {
+                        $set: {
+                            tier: plan.tier,
+                            subscriptionStatus: 'active',
+                            stripeSubscriptionId: session.subscription as string,
+                            currentPeriodEnd: new Date(session.expires_at! * 1000)
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'customer.subscription.updated':
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object as Stripe.Subscription;
+                const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
+                const userId = customer.metadata?.userId;
+
+                if (!userId) {
+                    throw new Error('Missing user ID');
+                }
+
+                if (subscription.status === 'active') {
+                    const periodEnd = (subscription as any).current_period_end;
+                    await usersCollection.updateOne(
+                        { _id: new ObjectId(userId) },
+                        {
+                            $set: {
+                                subscriptionStatus: 'active',
+                                currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined
+                            }
+                        }
+                    );
+                } else {
+                    await usersCollection.updateOne(
+                        { _id: new ObjectId(userId) },
+                        {
+                            $set: {
+                                subscriptionStatus: subscription.status,
+                                tier: 'basic' // Downgrade to basic tier
+                            }
+                        }
+                    );
+                }
+                break;
+            }
+        }
+
+        res.json({ received: true });
+    } catch (error: any) {
+        console.error('Webhook error:', error);
+        res.status(400).send(`Webhook Error: ${error.message}`);
+    }
+});
+
+// Static files (should be last)
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Start server
 connectToMongo().then(() => {

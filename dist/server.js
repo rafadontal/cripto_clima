@@ -14,7 +14,17 @@ const path_1 = __importDefault(require("path"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const auth_1 = require("./middleware/auth");
-dotenv_1.default.config();
+const config_1 = require("./config");
+const stripe_1 = __importDefault(require("stripe"));
+const config_2 = require("./config");
+// Load environment variables with override
+dotenv_1.default.config({ override: true });
+// Debug: Log all environment variables (safely)
+console.log('Environment variables loaded:');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
+console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
+console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -23,7 +33,7 @@ const oauth2Client = new googleapis_1.google.auth.OAuth2(process.env.GOOGLE_CLIE
 // Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
-app.use(express_1.default.static(path_1.default.join(__dirname, '../public')));
+// API routes should be defined BEFORE static file serving
 // MongoDB connection
 let client;
 let db;
@@ -41,6 +51,8 @@ async function connectToMongo() {
         channelsCollection = db.collection('channels');
         videosCollection = db.collection('videos');
         userVideoSummariesCollection = db.collection('user_video_summaries');
+        // Set users collection in auth middleware
+        (0, auth_1.setUsersCollection)(usersCollection);
     }
     catch (error) {
         console.error('MongoDB connection error:', error);
@@ -56,6 +68,12 @@ const youtube = googleapis_1.google.youtube({
 const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
+// Initialize Stripe
+const stripe = new stripe_1.default((0, config_2.getStripeConfig)().secretKey, {
+    apiVersion: '2025-04-30.basil'
+});
+// Debug: Log the first few characters of the key being used
+console.log('Stripe key being used (first 8 chars):', (0, config_2.getStripeConfig)().secretKey.substring(0, 8));
 // Google OAuth Routes
 app.get('/api/auth/google/url', (req, res) => {
     const scopes = [
@@ -93,7 +111,9 @@ app.get('/api/auth/google/callback', async (req, res) => {
                 email: data.email,
                 name: data.name || '',
                 googleId: data.id || undefined,
-                createdAt: new Date()
+                createdAt: new Date(),
+                tier: 'basic',
+                subscriptionStatus: 'unpaid'
             };
             const result = await usersCollection.insertOne(newUser);
             user = { ...newUser, _id: result.insertedId };
@@ -122,7 +142,9 @@ app.post('/api/register', async (req, res) => {
         const user = {
             email,
             password: hashedPassword,
-            createdAt: new Date()
+            createdAt: new Date(),
+            tier: 'basic',
+            subscriptionStatus: 'unpaid'
         };
         const result = await usersCollection.insertOne(user);
         const token = jsonwebtoken_1.default.sign({ userId: result.insertedId.toString(), email }, JWT_SECRET);
@@ -147,6 +169,14 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jsonwebtoken_1.default.sign({ userId: user._id.toString(), email }, JWT_SECRET);
+        // If user is unpaid, return subscription required
+        if (user.subscriptionStatus === 'unpaid') {
+            return res.json({
+                token,
+                subscriptionRequired: true,
+                redirectTo: '/landing.html'
+            });
+        }
         res.json({ token });
     }
     catch (error) {
@@ -642,6 +672,140 @@ app.get('/api/feed', auth_1.auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch feed' });
     }
 });
+// Get subscription plans
+app.get('/api/subscription/plans', (req, res) => {
+    res.json(config_1.SUBSCRIPTION_PLANS);
+});
+// Serve landing page as default
+app.get('/', (req, res) => {
+    res.sendFile(path_1.default.join(__dirname, '../public/landing.html'));
+});
+// Create subscription checkout session
+app.post('/api/subscription/create-checkout', auth_1.auth, async (req, res) => {
+    try {
+        const { planId } = req.body;
+        const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
+        if (!plan) {
+            return res.status(400).json({ error: 'Invalid plan' });
+        }
+        const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Return the pre-created payment link
+        res.json({ url: plan.paymentLink });
+    }
+    catch (error) {
+        console.error('Error getting payment link:', error);
+        res.status(500).json({ error: 'Failed to get payment link' });
+    }
+});
+// Get user's usage statistics
+app.get('/api/account/usage', auth_1.auth, async (req, res) => {
+    console.log('User in /api/account/usage:', req.user);
+    try {
+        const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.tier === user.tier);
+        if (!plan) {
+            return res.status(404).json({ error: 'Plan not found' });
+        }
+        // Get current month's start date
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Count channels
+        const channelsCount = await channelsCollection.countDocuments({
+            userId: new mongodb_1.ObjectId(req.user?.userId)
+        });
+        // Count videos this month
+        const videosThisMonth = await videosCollection.countDocuments({
+            userId: new mongodb_1.ObjectId(req.user?.userId),
+            createdAt: { $gte: startOfMonth }
+        });
+        res.json({
+            channelsCount,
+            videosThisMonth,
+            maxChannels: plan.maxChannels,
+            maxVideosPerMonth: plan.maxVideosPerMonth,
+            tier: user.tier,
+            subscriptionStatus: user.subscriptionStatus,
+            nextBillingDate: user.currentPeriodEnd
+        });
+    }
+    catch (error) {
+        console.error('Error getting usage statistics:', error);
+        res.status(500).json({ error: 'Failed to get usage statistics' });
+    }
+});
+// Stripe webhook handler
+app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
+    if (!stripe) {
+        return res.status(503).json({ error: 'Subscription service is currently unavailable' });
+    }
+    const sig = req.headers['stripe-signature'];
+    try {
+        const event = stripe.webhooks.constructEvent(req.body, sig, (0, config_2.getStripeConfig)().webhookSecret);
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                const userId = session.metadata?.userId;
+                const planId = session.metadata?.planId;
+                if (!userId || !planId) {
+                    throw new Error('Missing metadata');
+                }
+                const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
+                if (!plan) {
+                    throw new Error('Invalid plan');
+                }
+                await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
+                    $set: {
+                        tier: plan.tier,
+                        subscriptionStatus: 'active',
+                        stripeSubscriptionId: session.subscription,
+                        currentPeriodEnd: new Date(session.expires_at * 1000)
+                    }
+                });
+                break;
+            }
+            case 'customer.subscription.updated':
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object;
+                const customer = await stripe.customers.retrieve(subscription.customer);
+                const userId = customer.metadata?.userId;
+                if (!userId) {
+                    throw new Error('Missing user ID');
+                }
+                if (subscription.status === 'active') {
+                    const periodEnd = subscription.current_period_end;
+                    await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
+                        $set: {
+                            subscriptionStatus: 'active',
+                            currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined
+                        }
+                    });
+                }
+                else {
+                    await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
+                        $set: {
+                            subscriptionStatus: subscription.status,
+                            tier: 'basic' // Downgrade to basic tier
+                        }
+                    });
+                }
+                break;
+            }
+        }
+        res.json({ received: true });
+    }
+    catch (error) {
+        console.error('Webhook error:', error);
+        res.status(400).send(`Webhook Error: ${error.message}`);
+    }
+});
+// Static files (should be last)
+app.use(express_1.default.static(path_1.default.join(__dirname, '../public')));
 // Start server
 connectToMongo().then(() => {
     app.listen(port, () => {

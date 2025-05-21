@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account - YouTube Summary App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-gray-800">YouTube Summary App</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-gray-600 hover:text-gray-900">Home</a>
+                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Account Overview</h2>
+            
+            <!-- Subscription Status -->
+            <div class="mb-8">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Current Plan</h3>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-gray-500">Current Tier</p>
+                            <p class="text-xl font-semibold text-gray-900" id="currentTier">Loading...</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Status</p>
+                            <p class="text-xl font-semibold" id="subscriptionStatus">Loading...</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Next Billing Date</p>
+                            <p class="text-xl font-semibold text-gray-900" id="nextBillingDate">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Statistics -->
+            <div class="mb-8">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Usage This Month</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-sm text-gray-500">Channels</p>
+                        <div class="mt-2">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-700" id="channelsCount">0</span>
+                                <span class="text-sm text-gray-500" id="maxChannels">/ 0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-indigo-600 h-2 rounded-full" id="channelsProgress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-sm text-gray-500">Videos Summarized</p>
+                        <div class="mt-2">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-700" id="videosCount">0</span>
+                                <span class="text-sm text-gray-500" id="maxVideos">/ 0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-indigo-600 h-2 rounded-full" id="videosProgress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plan Management -->
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Manage Subscription</h3>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 mb-4">Need more channels or videos? Upgrade your plan to get more features.</p>
+                    <a href="/landing.html" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        View Plans
+                    </a>
+                    <div id="subscriptionPlans" class="mt-6"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Logout handler
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+
+        // Load and display subscription plans
+        async function loadSubscriptionPlans(currentTier) {
+            try {
+                const response = await fetch('/api/subscription/plans', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to fetch plans');
+                const plans = await response.json();
+                const container = document.getElementById('subscriptionPlans');
+                if (!container) return;
+                container.innerHTML = '';
+                plans.forEach(plan => {
+                    const isCurrent = plan.tier === currentTier;
+                    const planDiv = document.createElement('div');
+                    planDiv.className = `mb-4 p-4 rounded-lg border ${isCurrent ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 bg-white'}`;
+                    planDiv.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-lg font-semibold">${plan.name}</div>
+                                <div class="text-gray-500">€${plan.price}/month</div>
+                                <ul class="text-sm text-gray-600 mt-2 list-disc ml-5">
+                                    ${plan.features.map(f => `<li>${f}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div>
+                                ${isCurrent ? `<span class='px-3 py-1 bg-indigo-600 text-white rounded-full text-xs'>Current</span>` : `<button class='upgradeBtn px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700' data-plan='${plan.id}'>Upgrade</button>`}
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(planDiv);
+                });
+                // Add event listeners for upgrade buttons
+                document.querySelectorAll('.upgradeBtn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const planId = e.target.getAttribute('data-plan');
+                        try {
+                            const resp = await fetch('/api/subscription/create-checkout', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ planId })
+                            });
+                            const data = await resp.json();
+                            if (resp.ok && data.sessionId) {
+                                window.location.href = `https://checkout.stripe.com/pay/${data.sessionId}`;
+                            } else {
+                                alert(data.error || 'Failed to start checkout');
+                            }
+                        } catch (err) {
+                            alert('Error starting checkout: ' + err.message);
+                        }
+                    });
+                });
+            } catch (err) {
+                console.error('Error loading plans:', err);
+            }
+        }
+
+        // Load account information
+        async function loadAccountInfo() {
+            try {
+                const response = await fetch('/api/account/usage', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Failed to fetch account information');
+                }
+
+                const data = await response.json();
+                
+                // Update subscription status
+                document.getElementById('currentTier').textContent = data.tier.charAt(0).toUpperCase() + data.tier.slice(1);
+                document.getElementById('subscriptionStatus').textContent = data.subscriptionStatus.charAt(0).toUpperCase() + data.subscriptionStatus.slice(1);
+                document.getElementById('nextBillingDate').textContent = data.nextBillingDate ? new Date(data.nextBillingDate).toLocaleDateString() : 'N/A';
+
+                // Update usage statistics
+                document.getElementById('channelsCount').textContent = data.channelsCount;
+                document.getElementById('maxChannels').textContent = `/ ${data.maxChannels}`;
+                document.getElementById('videosCount').textContent = data.videosThisMonth;
+                document.getElementById('maxVideos').textContent = `/ ${data.maxVideosPerMonth}`;
+
+                // Update progress bars
+                const channelsProgress = (data.channelsCount / data.maxChannels) * 100;
+                const videosProgress = (data.videosThisMonth / data.maxVideosPerMonth) * 100;
+                
+                document.getElementById('channelsProgress').style.width = `${Math.min(channelsProgress, 100)}%`;
+                document.getElementById('videosProgress').style.width = `${Math.min(videosProgress, 100)}%`;
+
+                // Add warning colors if approaching limits
+                if (channelsProgress > 80) {
+                    document.getElementById('channelsProgress').classList.add('bg-yellow-500');
+                }
+                if (videosProgress > 80) {
+                    document.getElementById('videosProgress').classList.add('bg-yellow-500');
+                }
+                if (channelsProgress >= 100) {
+                    document.getElementById('channelsProgress').classList.add('bg-red-500');
+                }
+                if (videosProgress >= 100) {
+                    document.getElementById('videosProgress').classList.add('bg-red-500');
+                }
+                loadSubscriptionPlans(data.tier);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while loading account information: ' + (error.message || error));
+            }
+        }
+
+        // Load initial data
+        loadAccountInfo();
+    </script>
+</body>
+</html> 

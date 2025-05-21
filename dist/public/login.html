@@ -102,7 +102,27 @@
         // Check if already logged in
         const token = localStorage.getItem('token');
         if (token) {
-            window.location.href = '/index.html';
+            // Check subscription status
+            fetch('/api/account/usage', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.subscriptionStatus === 'active') {
+                    window.location.href = '/';
+                } else {
+                    // If not subscribed, redirect to landing page
+                    localStorage.removeItem('token');
+                    window.location.href = '/landing.html';
+                }
+            })
+            .catch(() => {
+                // If error, redirect to landing page
+                localStorage.removeItem('token');
+                window.location.href = '/landing.html';
+            });
         }
 
         // Show error message
@@ -123,6 +143,7 @@
         // Handle login
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
@@ -136,10 +157,37 @@
                 });
 
                 const data = await response.json();
-
+                
                 if (response.ok) {
                     localStorage.setItem('token', data.token);
-                    window.location.href = '/index.html';
+                    
+                    // Check if subscription is required
+                    if (data.subscriptionRequired) {
+                        const selectedPlan = localStorage.getItem('selectedPlan');
+                        if (selectedPlan) {
+                            // Create checkout session
+                            const checkoutResponse = await fetch('/api/subscription/create-checkout', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${data.token}`
+                                },
+                                body: JSON.stringify({ planId: selectedPlan })
+                            });
+                            
+                            const checkoutData = await checkoutResponse.json();
+                            if (checkoutResponse.ok && checkoutData.url) {
+                                // Redirect to Stripe checkout
+                                window.location.href = checkoutData.url;
+                            } else {
+                                showError(checkoutData.error || 'Failed to create checkout session');
+                            }
+                        } else {
+                            window.location.href = '/landing.html';
+                        }
+                    } else {
+                        window.location.href = '/';
+                    }
                 } else {
                     showError(data.error || 'Login failed');
                 }
@@ -167,7 +215,28 @@
 
                 if (response.ok) {
                     localStorage.setItem('token', data.token);
-                    window.location.href = '/index.html';
+                    const selectedPlan = localStorage.getItem('selectedPlan');
+                    if (selectedPlan) {
+                        // Create checkout session
+                        const checkoutResponse = await fetch('/api/subscription/create-checkout', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${data.token}`
+                            },
+                            body: JSON.stringify({ planId: selectedPlan })
+                        });
+                        
+                        const checkoutData = await checkoutResponse.json();
+                        if (checkoutResponse.ok && checkoutData.url) {
+                            // Redirect to Stripe checkout
+                            window.location.href = checkoutData.url;
+                        } else {
+                            showError(checkoutData.error || 'Failed to create checkout session');
+                        }
+                    } else {
+                        window.location.href = '/landing.html';
+                    }
                 } else {
                     showError(data.error || 'Registration failed');
                 }
@@ -195,5 +264,4 @@
         }
     </script>
 </body>
-</html> 
 </html> 

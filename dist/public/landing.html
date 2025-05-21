@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Summary App - Choose Your Plan</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">YouTube Summary App</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/login.html" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <div class="text-center">
+            <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+                Choose Your Plan
+            </h2>
+            <p class="mt-4 text-xl text-gray-600">
+                Get AI-powered summaries of your favorite YouTube channels
+            </p>
+        </div>
+
+        <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-6 lg:max-w-4xl lg:mx-auto">
+            <!-- Basic Plan -->
+            <div class="bg-white rounded-lg shadow-lg divide-y divide-gray-200">
+                <div class="p-6">
+                    <h3 class="text-2xl font-semibold text-gray-900">Basic</h3>
+                    <p class="mt-4 text-gray-500">Perfect for casual users</p>
+                    <p class="mt-8">
+                        <span class="text-4xl font-extrabold text-gray-900">€10</span>
+                        <span class="text-base font-medium text-gray-500">/month</span>
+                    </p>
+                    <a href="/login.html?plan=basic" class="mt-8 block w-full bg-indigo-600 text-white text-center py-2 px-4 rounded-md hover:bg-indigo-700">
+                        Get Started
+                    </a>
+                </div>
+                <div class="pt-6 pb-8 px-6">
+                    <h4 class="text-sm font-medium text-gray-900 tracking-wide">What's included</h4>
+                    <ul class="mt-6 space-y-4">
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">5 channels</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">50 videos per month</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">Basic support</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Professional Plan -->
+            <div class="bg-white rounded-lg shadow-lg divide-y divide-gray-200 border-2 border-indigo-500">
+                <div class="p-6">
+                    <h3 class="text-2xl font-semibold text-gray-900">Professional</h3>
+                    <p class="mt-4 text-gray-500">For power users</p>
+                    <p class="mt-8">
+                        <span class="text-4xl font-extrabold text-gray-900">€30</span>
+                        <span class="text-base font-medium text-gray-500">/month</span>
+                    </p>
+                    <a href="/login.html?plan=professional" class="mt-8 block w-full bg-indigo-600 text-white text-center py-2 px-4 rounded-md hover:bg-indigo-700">
+                        Get Started
+                    </a>
+                </div>
+                <div class="pt-6 pb-8 px-6">
+                    <h4 class="text-sm font-medium text-gray-900 tracking-wide">What's included</h4>
+                    <ul class="mt-6 space-y-4">
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">20 channels</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">200 videos per month</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">Priority support</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Premium Plan -->
+            <div class="bg-white rounded-lg shadow-lg divide-y divide-gray-200">
+                <div class="p-6">
+                    <h3 class="text-2xl font-semibold text-gray-900">Premium</h3>
+                    <p class="mt-4 text-gray-500">For businesses</p>
+                    <p class="mt-8">
+                        <span class="text-4xl font-extrabold text-gray-900">€50</span>
+                        <span class="text-base font-medium text-gray-500">/month</span>
+                    </p>
+                    <a href="/login.html?plan=premium" class="mt-8 block w-full bg-indigo-600 text-white text-center py-2 px-4 rounded-md hover:bg-indigo-700">
+                        Get Started
+                    </a>
+                </div>
+                <div class="pt-6 pb-8 px-6">
+                    <h4 class="text-sm font-medium text-gray-900 tracking-wide">What's included</h4>
+                    <ul class="mt-6 space-y-4">
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">Unlimited channels</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">500 videos per month</span>
+                        </li>
+                        <li class="flex space-x-3">
+                            <svg class="flex-shrink-0 h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-sm text-gray-500">24/7 support</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if user is already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Check subscription status
+            fetch('/api/account/usage', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.subscriptionStatus === 'active') {
+                    window.location.href = '/';
+                } else {
+                    // If not subscribed, stay on landing page
+                    localStorage.removeItem('token');
+                }
+            })
+            .catch(() => {
+                // If error, stay on landing page
+                localStorage.removeItem('token');
+            });
+        }
+
+        // Get plan from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const plan = urlParams.get('plan');
+        if (plan) {
+            // Store the selected plan
+            localStorage.setItem('selectedPlan', plan);
+            // Redirect to login
+            window.location.href = '/login.html';
+        }
+
+        // Update plan links to store selection before redirecting
+        document.querySelectorAll('a[href^="/login.html"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const plan = e.target.closest('.bg-white').querySelector('h3').textContent.toLowerCase();
+                localStorage.setItem('selectedPlan', plan);
+            });
+        });
+    </script>
+</body>
+</html> 

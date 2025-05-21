@@ -12,6 +12,7 @@
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
+    "@types/stripe": "^8.0.416",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -20,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.3.0",
     "openai": "^4.20.1",
+    "stripe": "^18.1.0",
     "youtube-transcript": "^1.0.6"
   },
   "devDependencies": {

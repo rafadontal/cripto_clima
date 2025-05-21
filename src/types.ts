@@ -1,13 +1,41 @@
 import { Request } from 'express';
 import { ObjectId } from 'mongodb';
 
+export type UserTier = 'basic' | 'pro' | 'premium';
+
+export interface SubscriptionPlan {
+    id: string;
+    name: string;
+    tier: UserTier;
+    price: number;
+    maxChannels: number;
+    maxVideosPerMonth: number;
+    features: string[];
+    paymentLink: string;
+}
+
 export interface User {
-  _id?: ObjectId;
-  email: string;
-  password?: string;
-  name?: string;
-  googleId?: string;
-  createdAt: Date;
+    _id?: ObjectId;
+    email: string;
+    password?: string;
+    name?: string;
+    googleId?: string;
+    createdAt: Date;
+    tier: UserTier;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid';
+    currentPeriodEnd?: Date;
+}
+
+export interface UsageStats {
+    channelsCount: number;
+    videosThisMonth: number;
+    maxChannels: number;
+    maxVideosPerMonth: number;
+    tier: UserTier;
+    subscriptionStatus: string;
+    nextBillingDate?: Date;
 }
 
 export interface Channel {

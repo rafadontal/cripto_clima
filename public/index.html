@@ -14,7 +14,8 @@
                 <div class="flex items-center">
                     <h1 class="text-xl font-bold text-gray-800">YouTube Summary App</h1>
                 </div>
-                <div class="flex items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="/account.html" class="text-gray-600 hover:text-gray-900">Account</a>
                     <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Logout</button>
                 </div>
             </div>
@@ -206,7 +207,43 @@
         // Check authentication
         const token = localStorage.getItem('token');
         if (!token) {
-            window.location.href = '/login.html';
+            window.location.href = '/landing.html';
+        }
+
+        // Add token to all API requests
+        function addAuthHeader(headers = {}) {
+            return {
+                ...headers,
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Handle API responses
+        async function handleApiResponse(response) {
+            if (response.status === 403) {
+                const data = await response.json();
+                if (data.redirectTo) {
+                    window.location.href = data.redirectTo;
+                    return null;
+                }
+            }
+            return response;
+        }
+
+        // Example of how to use in API calls
+        async function fetchChannels() {
+            try {
+                const response = await fetch('/api/channels', {
+                    headers: addAuthHeader()
+                });
+                const handledResponse = await handleApiResponse(response);
+                if (!handledResponse) return;
+                
+                const data = await handledResponse.json();
+                // Handle the data...
+            } catch (error) {
+                console.error('Error:', error);
+            }
         }
 
         // Helper function to extract channel handle
