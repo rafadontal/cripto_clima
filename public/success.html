@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento Concluído - YouTube Summary App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+        <div class="mb-6">
+            <svg class="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Pagamento Concluído!</h2>
+        <p class="text-gray-600 mb-8">Obrigado por assinar nosso serviço. Você será redirecionado automaticamente para o aplicativo.</p>
+        <div id="loading" class="mb-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+        </div>
+        <div id="error" class="hidden text-red-600 mb-4"></div>
+    </div>
+
+    <script>
+        async function verifySubscription() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+            const token = localStorage.getItem('token');
+            
+            if (!sessionId) {
+                showError('Sessão de pagamento não encontrada');
+                return;
+            }
+
+            if (!token) {
+                showError('Sessão de autenticação não encontrada');
+                return;
+            }
+
+            try {
+                // Verify the subscription status
+                const response = await fetch('/api/subscription/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ sessionId })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Falha ao verificar assinatura');
+                }
+
+                const data = await response.json();
+                
+                if (data.subscriptionStatus === 'active') {
+                    // Get a new token with updated subscription status
+                    const loginResponse = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email: localStorage.getItem('userEmail'),
+                            password: localStorage.getItem('userPassword')
+                        })
+                    });
+
+                    if (!loginResponse.ok) {
+                        throw new Error('Falha ao autenticar após pagamento');
+                    }
+
+                    const loginData = await loginResponse.json();
+                    localStorage.setItem('token', loginData.token);
+
+                    // Show success message with promo code info if available
+                    const successMessage = document.querySelector('p.text-gray-600');
+                    if (data.promoCode) {
+                        successMessage.textContent = `Obrigado por assinar nosso serviço! Seu código promocional "${data.promoCode}" foi aplicado com sucesso. Você será redirecionado automaticamente para o aplicativo.`;
+                    }
+
+                    // Redirect to app after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/index.html';
+                    }, 2000);
+                } else {
+                    showError('Erro ao ativar sua assinatura. Por favor, entre em contato com o suporte.');
+                }
+            } catch (error) {
+                showError('Erro ao verificar sua assinatura. Por favor, tente novamente.');
+                console.error('Error:', error);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        // Start verification when page loads
+        verifySubscription();
+    </script>
+</body>
+</html> 

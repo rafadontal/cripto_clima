@@ -169,15 +169,22 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jsonwebtoken_1.default.sign({ userId: user._id.toString(), email }, JWT_SECRET);
-        // If user is unpaid, return subscription required
-        if (user.subscriptionStatus === 'unpaid') {
+        // Check subscription status
+        if (user.subscriptionStatus === 'active') {
+            // User has active subscription, return token and redirect to app
+            return res.json({
+                token,
+                redirectTo: '/index.html'
+            });
+        }
+        else {
+            // User needs to subscribe, return token and redirect to landing
             return res.json({
                 token,
                 subscriptionRequired: true,
                 redirectTo: '/landing.html'
             });
         }
-        res.json({ token });
     }
     catch (error) {
         console.error('Error logging in:', error);
@@ -680,25 +687,70 @@ app.get('/api/subscription/plans', (req, res) => {
 app.get('/', (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/landing.html'));
 });
-// Create subscription checkout session
+// Subscription routes
 app.post('/api/subscription/create-checkout', auth_1.auth, async (req, res) => {
     try {
         const { planId } = req.body;
-        const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
-        if (!plan) {
-            return res.status(400).json({ error: 'Invalid plan' });
-        }
         const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(req.user?.userId) });
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        // Return the pre-created payment link
-        res.json({ url: plan.paymentLink });
+        // Get the plan details
+        const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
+        if (!plan) {
+            return res.status(400).json({ error: 'Invalid plan' });
+        }
+        // Get or create Stripe customer
+        let customer;
+        if (user.stripeCustomerId) {
+            customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        }
+        else {
+            customer = await stripe.customers.create({
+                email: user.email,
+                metadata: {
+                    userId: user._id.toString()
+                }
+            });
+            // Update user with Stripe customer ID
+            await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(user._id) }, { $set: { stripeCustomerId: customer.id } });
+        }
+        // Create checkout session
+        const session = await stripe.checkout.sessions.create({
+            customer: customer.id,
+            payment_method_types: ['card'],
+            line_items: [{
+                    price_data: {
+                        currency: 'brl',
+                        product_data: {
+                            name: plan.name,
+                        },
+                        unit_amount: plan.price * 100, // Convert to cents
+                        recurring: {
+                            interval: 'month'
+                        },
+                    },
+                    quantity: 1,
+                }],
+            mode: 'subscription',
+            success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/landing.html`,
+            metadata: {
+                userId: user._id.toString(),
+                planId: plan.id
+            },
+            allow_promotion_codes: true // Enable promo codes
+        });
+        res.json({ url: session.url });
     }
     catch (error) {
-        console.error('Error getting payment link:', error);
-        res.status(500).json({ error: 'Failed to get payment link' });
+        console.error('Error creating checkout session:', error);
+        res.status(500).json({ error: 'Error creating checkout session' });
     }
+});
+// Add success page endpoint
+app.get('/success', (req, res) => {
+    res.sendFile(path_1.default.join(__dirname, '../public/success.html'));
 });
 // Get user's usage statistics
 app.get('/api/account/usage', auth_1.auth, async (req, res) => {
@@ -802,6 +854,58 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
     catch (error) {
         console.error('Webhook error:', error);
         res.status(400).send(`Webhook Error: ${error.message}`);
+    }
+});
+// Add subscription verification endpoint
+app.post('/api/subscription/verify', auth_1.auth, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Retrieve the checkout session
+        const session = await stripe.checkout.sessions.retrieve(sessionId, {
+            expand: ['total_details.breakdown.discounts']
+        });
+        if (session.payment_status !== 'paid') {
+            return res.status(400).json({ error: 'Payment not completed' });
+        }
+        // Get the subscription
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        if (subscription.status !== 'active') {
+            return res.status(400).json({ error: 'Subscription not active' });
+        }
+        // Get plan ID from session metadata
+        const planId = session.metadata?.planId;
+        if (!planId) {
+            return res.status(400).json({ error: 'Invalid session metadata' });
+        }
+        // Get promo code information if used
+        let promoCode = null;
+        if (session.total_details?.breakdown?.discounts && session.total_details.breakdown.discounts.length > 0) {
+            const discount = session.total_details.breakdown.discounts[0];
+            promoCode = discount.promotion_code?.code || discount.coupon?.id;
+        }
+        // Update user's subscription status
+        await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(user._id) }, {
+            $set: {
+                subscriptionStatus: 'active',
+                subscriptionId: subscription.id,
+                subscriptionTier: planId,
+                subscriptionStartDate: new Date(),
+                promoCode: promoCode // Store the promo code used
+            }
+        });
+        res.json({
+            subscriptionStatus: 'active',
+            message: 'Subscription activated successfully',
+            promoCode: promoCode
+        });
+    }
+    catch (error) {
+        console.error('Error verifying subscription:', error);
+        res.status(500).json({ error: 'Error verifying subscription' });
     }
 });
 // Static files (should be last)
