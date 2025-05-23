@@ -276,7 +276,7 @@
                         if (checkoutResponse.ok) {
                             const checkoutData = await checkoutResponse.json();
                             if (checkoutData.url) {
-                                window.location.replace(checkoutData.url);
+                                window.location.href = checkoutData.url;
                             }
                         }
                     } else {

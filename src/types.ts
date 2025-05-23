@@ -26,6 +26,7 @@ export interface User {
     stripeSubscriptionId?: string;
     subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid';
     currentPeriodEnd?: Date;
+    promoCode?: string | null;
 }
 
 export interface UsageStats {
@@ -39,10 +40,11 @@ export interface UsageStats {
 }
 
 export interface Channel {
-  _id?: ObjectId;
-  userId: ObjectId;
-  channelUrl: string;
-  createdAt: Date;
+    _id?: ObjectId;
+    userId: ObjectId;
+    channelUrl: string;
+    createdAt: Date;
+    lastUpdated?: Date;
 }
 
 export interface Video {
@@ -52,6 +54,7 @@ export interface Video {
   title: string;
   publishedAt: string;
   summary: string;
+  transcript?: string;
   createdAt: Date;
   profilePictureUrl?: string | null;
 }

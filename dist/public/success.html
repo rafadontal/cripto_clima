@@ -38,8 +38,8 @@
             }
 
             try {
-                // Verify the subscription status
-                const response = await fetch('/api/subscription/verify', {
+                // First, verify and update the subscription status
+                const verifyResponse = await fetch('/api/subscription/verify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -48,13 +48,13 @@
                     body: JSON.stringify({ sessionId })
                 });
 
-                if (!response.ok) {
-                    throw new Error('Falha ao verificar assinatura');
+                const verifyData = await verifyResponse.json();
+
+                if (!verifyResponse.ok) {
+                    throw new Error(verifyData.error || 'Falha ao verificar assinatura');
                 }
 
-                const data = await response.json();
-                
-                if (data.subscriptionStatus === 'active') {
+                if (verifyData.subscriptionStatus === 'active') {
                     // Get a new token with updated subscription status
                     const loginResponse = await fetch('/api/login', {
                         method: 'POST',
@@ -76,20 +76,25 @@
 
                     // Show success message with promo code info if available
                     const successMessage = document.querySelector('p.text-gray-600');
-                    if (data.promoCode) {
-                        successMessage.textContent = `Obrigado por assinar nosso serviço! Seu código promocional "${data.promoCode}" foi aplicado com sucesso. Você será redirecionado automaticamente para o aplicativo.`;
+                    if (verifyData.promoCode) {
+                        successMessage.textContent = `Obrigado por assinar nosso serviço! Seu código promocional "${verifyData.promoCode}" foi aplicado com sucesso. Você será redirecionado automaticamente para o aplicativo.`;
+                    } else {
+                        successMessage.textContent = 'Obrigado por assinar nosso serviço! Você será redirecionado automaticamente para o aplicativo.';
                     }
+
+                    // Hide loading spinner
+                    document.getElementById('loading').classList.add('hidden');
 
                     // Redirect to app after a short delay
                     setTimeout(() => {
                         window.location.href = '/index.html';
                     }, 2000);
                 } else {
-                    showError('Erro ao ativar sua assinatura. Por favor, entre em contato com o suporte.');
+                    throw new Error('Status da assinatura não atualizado corretamente');
                 }
             } catch (error) {
-                showError('Erro ao verificar sua assinatura. Por favor, tente novamente.');
                 console.error('Error:', error);
+                showError(error.message || 'Erro ao verificar sua assinatura. Por favor, tente novamente.');
             }
         }
 

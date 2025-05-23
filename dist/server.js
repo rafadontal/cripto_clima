@@ -3,6 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.youtube = void 0;
+exports.getChannelId = getChannelId;
+exports.generateSummary = generateSummary;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -53,6 +56,10 @@ async function connectToMongo() {
         userVideoSummariesCollection = db.collection('user_video_summaries');
         // Set users collection in auth middleware
         (0, auth_1.setUsersCollection)(usersCollection);
+        // Initialize background jobs
+        const { initializeCollections, startBackgroundJobs } = require('./backgroundJobs');
+        await initializeCollections(client);
+        await startBackgroundJobs();
     }
     catch (error) {
         console.error('MongoDB connection error:', error);
@@ -64,6 +71,7 @@ const youtube = googleapis_1.google.youtube({
     version: 'v3',
     auth: process.env.YOUTUBE_API_KEY
 });
+exports.youtube = youtube;
 // OpenAI setup
 const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY
@@ -305,8 +313,8 @@ app.get('/api/channels/:channelUrl/video', auth_1.auth, async (req, res) => {
             return res.status(404).json({ error: 'No videos found for this channel' });
         }
         // Generate summary
-        const summary = await generateSummary(videoData.videoId);
-        if (!summary) {
+        const result = await generateSummary(videoData.videoId);
+        if (!result) {
             return res.status(500).json({ error: 'Failed to generate summary' });
         }
         // Save to database
@@ -315,7 +323,8 @@ app.get('/api/channels/:channelUrl/video', auth_1.auth, async (req, res) => {
             videoId: videoData.videoId,
             title: videoData.title,
             publishedAt: videoData.publishedAt,
-            summary,
+            summary: result.summary,
+            transcript: result.transcript,
             createdAt: new Date()
         };
         await videosCollection.insertOne(videoInfo);
@@ -362,8 +371,8 @@ app.get('/api/channels/:channelUrl/videos', auth_1.auth, async (req, res) => {
                 return;
             }
             // Only fetch transcript and create new entry if it's a new video
-            const summary = await generateSummary(videoData.videoId);
-            if (!summary) {
+            const result = await generateSummary(videoData.videoId);
+            if (!result) {
                 return res.status(500).json({ error: 'Failed to generate summary' });
             }
             const videoInfo = {
@@ -371,7 +380,8 @@ app.get('/api/channels/:channelUrl/videos', auth_1.auth, async (req, res) => {
                 videoId: videoData.videoId,
                 title: videoData.title,
                 publishedAt: videoData.publishedAt,
-                summary,
+                summary: result.summary,
+                transcript: result.transcript,
                 createdAt: new Date()
             };
             await videosCollection.insertOne(videoInfo);
@@ -467,8 +477,8 @@ app.post('/api/videos/summary', auth_1.auth, async (req, res) => {
             return res.status(404).json({ error: 'Video not found' });
         }
         // Generate summary
-        const summary = await generateSummary(videoId);
-        if (!summary) {
+        const result = await generateSummary(videoId);
+        if (!result) {
             return res.status(503).json({
                 error: 'Não foi possível gerar o resumo neste momento. O vídeo pode não ter legendas disponíveis ou pode ser muito curto.',
                 retryAfter: 3600 // Suggest retrying after 1 hour
@@ -480,7 +490,8 @@ app.post('/api/videos/summary', auth_1.auth, async (req, res) => {
             videoId,
             title: videoData.title,
             publishedAt: videoData.publishedAt,
-            summary,
+            summary: result.summary,
+            transcript: result.transcript,
             createdAt: new Date()
         };
         await userVideoSummariesCollection.insertOne(videoSummary);
@@ -607,7 +618,8 @@ ${text}`
             console.log(`Invalid summary generated for video ${videoId}`);
             return null;
         }
-        return summary;
+        // Return both summary and transcript
+        return { summary, transcript: text };
     }
     catch (error) {
         console.error('Error generating summary:', error);
@@ -669,8 +681,8 @@ app.get('/api/feed', auth_1.auth, async (req, res) => {
                 const videoInfo = videoDetails.data.items?.[0];
                 if (!videoInfo?.snippet?.title || !videoInfo?.snippet?.publishedAt)
                     return null;
-                const summary = await generateSummary(video.id.videoId);
-                if (!summary)
+                const result = await generateSummary(video.id.videoId);
+                if (!result)
                     return null;
                 // Get channel profile picture
                 const channelResponse = await youtube.channels.list({
@@ -685,7 +697,8 @@ app.get('/api/feed', auth_1.auth, async (req, res) => {
                     videoId: video.id.videoId,
                     title: videoInfo.snippet.title,
                     publishedAt: videoInfo.snippet.publishedAt,
-                    summary,
+                    summary: result.summary,
+                    transcript: result.transcript,
                     createdAt: new Date(),
                     profilePictureUrl
                 };
@@ -770,7 +783,10 @@ app.post('/api/subscription/create-checkout', auth_1.auth, async (req, res) => {
             },
             allow_promotion_codes: true // Enable promo codes
         });
-        res.json({ url: session.url });
+        res.json({
+            sessionId: session.id,
+            url: session.url
+        });
     }
     catch (error) {
         console.error('Error creating checkout session:', error);
@@ -840,12 +856,22 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                 if (!plan) {
                     throw new Error('Invalid plan');
                 }
+                // Get the subscription to get the current period end
+                const subscription = await stripe.subscriptions.retrieve(session.subscription);
+                const nextBillingDate = new Date(subscription.current_period_end * 1000);
+                // Get promo code information if used
+                let promoCode = null;
+                if (session.total_details?.breakdown?.discounts && session.total_details.breakdown.discounts.length > 0) {
+                    const discount = session.total_details.breakdown.discounts[0];
+                    promoCode = discount.promotion_code?.code || discount.coupon?.id;
+                }
                 await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
                     $set: {
                         tier: plan.tier,
                         subscriptionStatus: 'active',
                         stripeSubscriptionId: session.subscription,
-                        currentPeriodEnd: new Date(session.expires_at * 1000)
+                        currentPeriodEnd: nextBillingDate,
+                        promoCode: promoCode // Store the promo code
                     }
                 });
                 break;
@@ -859,11 +885,11 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                     throw new Error('Missing user ID');
                 }
                 if (subscription.status === 'active') {
-                    const periodEnd = subscription.current_period_end;
+                    const nextBillingDate = new Date(subscription.current_period_end * 1000);
                     await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
                         $set: {
                             subscriptionStatus: 'active',
-                            currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined
+                            currentPeriodEnd: nextBillingDate
                         }
                     });
                 }
@@ -871,7 +897,8 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                     await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
                         $set: {
                             subscriptionStatus: subscription.status,
-                            tier: 'basic' // Downgrade to basic tier
+                            tier: 'basic', // Downgrade to basic tier
+                            currentPeriodEnd: null // Clear the next billing date
                         }
                     });
                 }
@@ -893,15 +920,32 @@ app.post('/api/subscription/verify', auth_1.auth, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        // Retrieve the checkout session
+        // First check if user is already active
+        if (user.subscriptionStatus === 'active') {
+            return res.json({
+                subscriptionStatus: 'active',
+                message: 'Subscription already active',
+                promoCode: user.promoCode,
+                nextBillingDate: user.currentPeriodEnd
+            });
+        }
+        // Retrieve the checkout session with expanded subscription
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
-            expand: ['total_details.breakdown.discounts']
+            expand: ['subscription', 'total_details.breakdown.discounts']
         });
         if (session.payment_status !== 'paid') {
             return res.status(400).json({ error: 'Payment not completed' });
         }
+        // Get the subscription ID from the session
+        const subscriptionId = typeof session.subscription === 'string'
+            ? session.subscription
+            : session.subscription?.id;
+        if (!subscriptionId) {
+            console.error('Session data:', JSON.stringify(session, null, 2));
+            return res.status(400).json({ error: 'Invalid subscription ID' });
+        }
         // Get the subscription
-        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         if (subscription.status !== 'active') {
             return res.status(400).json({ error: 'Subscription not active' });
         }
@@ -916,20 +960,27 @@ app.post('/api/subscription/verify', auth_1.auth, async (req, res) => {
             const discount = session.total_details.breakdown.discounts[0];
             promoCode = discount.promotion_code?.code || discount.coupon?.id;
         }
+        // Calculate next billing date from subscription
+        const nextBillingDate = new Date(subscription.current_period_end * 1000);
         // Update user's subscription status
-        await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(user._id) }, {
+        const updateResult = await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(user._id) }, {
             $set: {
                 subscriptionStatus: 'active',
-                subscriptionId: subscription.id,
-                subscriptionTier: planId,
-                subscriptionStartDate: new Date(),
-                promoCode: promoCode // Store the promo code used
+                stripeSubscriptionId: subscriptionId,
+                tier: planId,
+                currentPeriodEnd: nextBillingDate,
+                promoCode: promoCode
             }
         });
+        if (updateResult.modifiedCount === 0) {
+            console.error('Failed to update user subscription status');
+            return res.status(500).json({ error: 'Failed to update subscription status' });
+        }
         res.json({
             subscriptionStatus: 'active',
             message: 'Subscription activated successfully',
-            promoCode: promoCode
+            promoCode: promoCode,
+            nextBillingDate: nextBillingDate
         });
     }
     catch (error) {
