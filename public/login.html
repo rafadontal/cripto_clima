@@ -33,8 +33,14 @@
                 <label for="loginPassword" class="block text-sm font-medium text-gray-700">Senha</label>
                 <input type="password" id="loginPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Entrar
+            <button type="submit" id="loginButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <span class="button-text">Entrar</span>
+                <div class="loading-spinner hidden">
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
             </button>
 
             <!-- Divider -->
@@ -74,8 +80,14 @@
                 <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirmar Senha</label>
                 <input type="password" id="confirmPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Criar Conta
+            <button type="submit" id="registerButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <span class="button-text">Criar Conta</span>
+                <div class="loading-spinner hidden">
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
             </button>
 
             <!-- Divider -->
@@ -120,11 +132,14 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.subscriptionStatus === 'active') {
-                        window.location.href = '/index.html';
+                        // Prevent any other redirects by using replace instead of href
+                        window.location.replace('/index.html');
                     }
                 }
             } catch (error) {
                 console.error('Error checking auth:', error);
+                // Clear invalid token
+                localStorage.removeItem('token');
             }
         }
 
@@ -163,9 +178,27 @@
             switchToLogin();
         }
 
+        // Helper function to show/hide loading state
+        function setLoading(buttonId, isLoading) {
+            const button = document.getElementById(buttonId);
+            const buttonText = button.querySelector('.button-text');
+            const spinner = button.querySelector('.loading-spinner');
+            
+            if (isLoading) {
+                button.disabled = true;
+                buttonText.classList.add('hidden');
+                spinner.classList.remove('hidden');
+            } else {
+                button.disabled = false;
+                buttonText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        }
+
         // Login form submission
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            setLoading('loginButton', true);
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
 
@@ -184,15 +217,18 @@
                     localStorage.setItem('userEmail', email);
                     localStorage.setItem('userPassword', password);
                     
+                    // Use the subscriptionStatus from the response
                     if (data.subscriptionStatus === 'active') {
-                        window.location.href = '/index.html';
+                        window.location.replace('/index.html');
                     } else {
-                        window.location.href = '/landing.html';
+                        window.location.replace('/landing.html');
                     }
                 } else {
+                    setLoading('loginButton', false);
                     showError(data.error || 'Erro ao fazer login');
                 }
             } catch (error) {
+                setLoading('loginButton', false);
                 showError('Erro ao fazer login. Tente novamente.');
             }
         });
@@ -200,11 +236,13 @@
         // Register form submission
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            setLoading('registerButton', true);
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
 
             if (password !== confirmPassword) {
+                setLoading('registerButton', false);
                 showError('As senhas não coincidem');
                 return;
             }
@@ -238,16 +276,18 @@
                         if (checkoutResponse.ok) {
                             const checkoutData = await checkoutResponse.json();
                             if (checkoutData.url) {
-                                window.location.href = checkoutData.url;
+                                window.location.replace(checkoutData.url);
                             }
                         }
                     } else {
-                        window.location.href = '/landing.html';
+                        window.location.replace('/landing.html');
                     }
                 } else {
+                    setLoading('registerButton', false);
                     showError(data.error || 'Erro ao criar conta');
                 }
             } catch (error) {
+                setLoading('registerButton', false);
                 showError('Erro ao criar conta. Tente novamente.');
             }
         });
@@ -261,23 +301,33 @@
         // Check auth status when page loads
         checkAuth();
 
-        // Add Google Sign In/Up handlers
+        // Add loading state to Google buttons
         document.getElementById('googleSignIn').addEventListener('click', async () => {
+            const button = document.getElementById('googleSignIn');
+            button.disabled = true;
+            button.classList.add('opacity-50');
             try {
                 const response = await fetch('/api/auth/google/url');
                 const data = await response.json();
                 window.location.href = data.url;
             } catch (error) {
+                button.disabled = false;
+                button.classList.remove('opacity-50');
                 showError('Falha ao iniciar login com Google');
             }
         });
 
         document.getElementById('googleSignUp').addEventListener('click', async () => {
+            const button = document.getElementById('googleSignUp');
+            button.disabled = true;
+            button.classList.add('opacity-50');
             try {
                 const response = await fetch('/api/auth/google/url');
                 const data = await response.json();
                 window.location.href = data.url;
             } catch (error) {
+                button.disabled = false;
+                button.classList.remove('opacity-50');
                 showError('Falha ao iniciar registro com Google');
             }
         });

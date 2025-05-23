@@ -210,12 +210,14 @@ app.post('/api/login', async (req: Request, res: Response) => {
       // User has active subscription, return token and redirect to app
       return res.json({ 
         token,
+        subscriptionStatus: 'active',
         redirectTo: '/index.html'
       });
     } else {
       // User needs to subscribe, return token and redirect to landing
       return res.json({ 
         token,
+        subscriptionStatus: 'unpaid',
         subscriptionRequired: true,
         redirectTo: '/landing.html'
       });
@@ -553,7 +555,10 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
     // Generate summary
     const summary = await generateSummary(videoId);
     if (!summary) {
-      return res.status(500).json({ error: 'Failed to generate summary' });
+      return res.status(503).json({ 
+        error: 'Não foi possível gerar o resumo neste momento. O vídeo pode não ter legendas disponíveis ou pode ser muito curto.',
+        retryAfter: 3600 // Suggest retrying after 1 hour
+      });
     }
 
     // Save to database
@@ -648,7 +653,29 @@ async function getLatestVideo(channelId: string) {
 async function generateSummary(videoId: string): Promise<string | null> {
   try {
     const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    
+    // Check if transcript is empty or too short
+    if (!transcript || transcript.length === 0) {
+      console.log(`No transcript available for video ${videoId}`);
+      return null;
+    }
+
+    // Join transcript segments and check if there's meaningful content
     const text = transcript.map(item => item.text).join(' ');
+    
+    // Check if the text is too short or contains only common phrases
+    const minLength = 100; // Minimum characters for a meaningful transcript
+    const commonPhrases = [
+      "please provide the transcript",
+      "no transcript available",
+      "transcript not found",
+      "unable to get transcript"
+    ];
+
+    if (text.length < minLength || commonPhrases.some(phrase => text.toLowerCase().includes(phrase))) {
+      console.log(`Invalid or too short transcript for video ${videoId}`);
+      return null;
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -676,7 +703,15 @@ ${text}`
       max_tokens: 800
     });
 
-    return response.choices[0].message.content;
+    const summary = response.choices[0].message.content;
+
+    // Validate the summary to ensure it's not a generic response
+    if (!summary || summary.toLowerCase().includes("please provide the transcript")) {
+      console.log(`Invalid summary generated for video ${videoId}`);
+      return null;
+    }
+
+    return summary;
   } catch (error) {
     console.error('Error generating summary:', error);
     return null;
