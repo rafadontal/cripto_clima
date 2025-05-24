@@ -1134,8 +1134,19 @@ app.post('/api/subscription/verify', auth, async (req: AuthRequest, res: Respons
             promoCode = discount.promotion_code?.code || discount.coupon?.id;
         }
 
-        // Calculate next billing date from subscription
-        const nextBillingDate = new Date((subscription as any).current_period_end * 1000);
+        // Calculate next billing date from billing_cycle_anchor
+        const billingCycleAnchor = (subscription as any).billing_cycle_anchor;
+        if (!billingCycleAnchor || typeof billingCycleAnchor !== 'number') {
+            console.error('Invalid billing_cycle_anchor from subscription:', subscription);
+            return res.status(500).json({ error: 'Invalid subscription period' });
+        }
+
+        // Create date from billing cycle anchor and add one month
+        const nextBillingDate = new Date(billingCycleAnchor * 1000); // Convert seconds to milliseconds
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1); // Add one month
+        
+        console.log('Billing cycle anchor:', new Date(billingCycleAnchor * 1000).toISOString());
+        console.log('Next billing date:', nextBillingDate.toISOString());
 
         // Update user's subscription status
         const updateResult = await usersCollection.updateOne(
