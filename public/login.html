@@ -309,11 +309,19 @@
             try {
                 const response = await fetch('/api/auth/google/url');
                 const data = await response.json();
-                window.location.href = data.url;
+                if (data.url) {
+                    // Store the selected plan before redirecting
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const plan = urlParams.get('plan');
+                    if (plan) {
+                        localStorage.setItem('selectedPlan', plan);
+                    }
+                    window.location.href = data.url;
+                }
             } catch (error) {
                 button.disabled = false;
                 button.classList.remove('opacity-50');
-                showError('Falha ao iniciar login com Google');
+                showError('Erro ao iniciar autenticação com Google');
             }
         });
 
@@ -324,11 +332,19 @@
             try {
                 const response = await fetch('/api/auth/google/url');
                 const data = await response.json();
-                window.location.href = data.url;
+                if (data.url) {
+                    // Store the selected plan before redirecting
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const plan = urlParams.get('plan');
+                    if (plan) {
+                        localStorage.setItem('selectedPlan', plan);
+                    }
+                    window.location.href = data.url;
+                }
             } catch (error) {
                 button.disabled = false;
                 button.classList.remove('opacity-50');
-                showError('Falha ao iniciar registro com Google');
+                showError('Erro ao iniciar autenticação com Google');
             }
         });
     </script>

@@ -24,9 +24,60 @@
             // Handle error
             window.location.href = `/login.html?error=${encodeURIComponent(error)}`;
         } else if (token) {
-            // Store token and redirect to main page
+            // Store token
             localStorage.setItem('token', token);
-            window.location.href = '/index.html';
+            
+            // Check if we have a selected plan
+            const selectedPlan = localStorage.getItem('selectedPlan');
+            
+            if (selectedPlan) {
+                // If we have a selected plan, proceed to checkout
+                fetch('/api/subscription/create-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ planId: selectedPlan })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.url) {
+                        // Clear the selected plan from storage
+                        localStorage.removeItem('selectedPlan');
+                        // Redirect to Stripe checkout
+                        window.location.href = data.url;
+                    } else {
+                        throw new Error('Failed to create checkout session');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating checkout session:', error);
+                    window.location.href = '/landing.html';
+                });
+            } else {
+                // No plan selected, check subscription status
+                fetch('/api/subscription/status', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.subscriptionStatus === 'active') {
+                        // User has active subscription, redirect to main page
+                        window.location.href = '/index.html';
+                    } else {
+                        // User needs to subscribe, redirect to landing page
+                        window.location.href = '/landing.html';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking subscription status:', error);
+                    // On error, redirect to landing page
+                    window.location.href = '/landing.html';
+                });
+            }
         } else {
             // No token or error, redirect to login
             window.location.href = '/login.html?error=Authentication failed';

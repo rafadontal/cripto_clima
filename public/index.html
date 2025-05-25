@@ -503,63 +503,72 @@
             }
 
             try {
-                let summaries = [];
-                
-                if (type === 'all' || type === 'history') {
-                    const historyResponse = await fetch('/api/videos/summaries', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const historyData = await historyResponse.json();
-                    summaries = summaries.concat(historyData);
-                }
-                
-                if (type === 'all' || type === 'channels') {
-                    const channelsResponse = await fetch('/api/channels', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const channels = await channelsResponse.json();
-                    
-                    for (const channel of channels) {
-                        const videosResponse = await fetch(`/api/channels/${encodeURIComponent(channel.channelUrl)}/videos?limit=5`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const videos = await videosResponse.json();
-                        summaries = summaries.concat(videos);
-                    }
+                const response = await fetch(`/api/search?query=${encodeURIComponent(searchTerm)}&type=${type}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to search videos');
                 }
 
-                // Filter summaries based on search term
-                const filteredSummaries = summaries.filter(summary => 
-                    summary.title.toLowerCase().includes(searchTerm) ||
-                    summary.summary.toLowerCase().includes(searchTerm)
-                );
-
-                // Display results with highlighted search terms
+                const summaries = await response.json();
                 const searchResults = document.getElementById('searchResults');
                 searchResults.innerHTML = '';
 
-                if (filteredSummaries.length === 0) {
+                if (summaries.length === 0) {
                     searchResults.innerHTML = '<div class="text-center text-gray-500 py-4">No results found</div>';
                     return;
                 }
 
-                filteredSummaries.forEach(summary => {
-                    const summaryElement = document.createElement('div');
-                    summaryElement.className = 'bg-gray-50 rounded-lg p-6 cursor-pointer hover:bg-gray-100';
-                    const parsedSummary = marked.parse(summary.summary);
-                    summaryElement.innerHTML = `
-                        <h4 class="text-lg font-medium text-gray-900 mb-2">${highlightText(summary.title, searchTerm)}</h4>
-                        <p class="text-sm text-gray-500 mb-4">Published: ${new Date(summary.publishedAt).toLocaleDateString()}</p>
-                        <div class="prose max-w-none">
-                            <div class="markdown-content">${highlightText(parsedSummary, searchTerm)}</div>
+                // Display results with highlighted search terms
+                searchResults.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-medium text-gray-900">Search Results</h3>
+                            <span class="text-sm text-gray-500">${summaries.length} results found</span>
                         </div>
-                    `;
-                    summaryElement.addEventListener('click', () => displaySummary(summary));
-                    searchResults.appendChild(summaryElement);
-                });
+                        <div class="space-y-4">
+                            ${summaries.map(summary => {
+                                const channelHandle = summary.source === 'channel' ? getChannelHandle(summary.channelUrl) : 'Personal Summary';
+                                const initials = getInitials(channelHandle);
+                                const highlightedTitle = highlightText(summary.title, searchTerm);
+                                const highlightedSummary = highlightText(summary.summary, searchTerm);
+                                
+                                return `
+                                    <div class="bg-white rounded-lg shadow p-4">
+                                        <div class="flex items-start space-x-4">
+                                            <div class="flex-shrink-0">
+                                                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                                    <span class="text-indigo-600 font-medium">${initials}</span>
+                                                </div>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <h4 class="text-lg font-medium text-gray-900 mb-1">${highlightedTitle}</h4>
+                                                <p class="text-sm text-gray-500 mb-2">${channelHandle}</p>
+                                                <div class="prose prose-sm max-w-none">
+                                                    ${highlightedSummary}
+                                                </div>
+                                                <div class="mt-4 flex items-center justify-between">
+                                                    <span class="text-sm text-gray-500">
+                                                        ${new Date(summary.publishedAt).toLocaleDateString()}
+                                                    </span>
+                                                    <button onclick="displaySummary(${JSON.stringify(summary)})" 
+                                                            class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                                                        View Full Summary
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred while searching summaries');
+                alert(error.message || 'An error occurred while searching');
             }
         });
 
@@ -688,6 +697,9 @@
                     return;
                 }
 
+                // Sort videos by publishedAt date
+                videos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
                 channelVideosList.innerHTML = videos.map(video => {
                     const parsedSummary = marked.parse(video.summary);
                     const channelHandle = getChannelHandle(channelUrl);
@@ -792,13 +804,17 @@
         // Load initial data
         loadChannels();
         loadSummaryHistory();
-        loadFeed();
+        // Show feed by default
+        document.getElementById('videoInputSection').classList.add('hidden');
+        document.getElementById('searchSection').classList.add('hidden');
+        document.getElementById('searchResults').innerHTML = ''; // Clear any existing content
+        loadFeed(); // Load the feed immediately
 
         // Helper function to highlight search terms
         function highlightText(text, searchTerm) {
             if (!searchTerm) return text;
             const regex = new RegExp(`(${searchTerm})`, 'gi');
-            return text.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
+            return text.replace(regex, '<mark class="bg-yellow-100">$1</mark>');
         }
 
         // Update the displaySummary function
@@ -905,8 +921,104 @@
         }
 
         // Update the view all channels handler
-        document.getElementById('viewAllChannels').addEventListener('click', () => {
-            loadFeed();
+        document.getElementById('viewAllChannels').addEventListener('click', async () => {
+            try {
+                // Hide other sections
+                document.getElementById('videoInputSection').classList.add('hidden');
+                document.getElementById('searchSection').classList.add('hidden');
+                
+                const searchResults = document.getElementById('searchResults');
+                searchResults.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-medium text-gray-900">All Channel Videos</h3>
+                            <button class="text-indigo-600 hover:text-indigo-900" onclick="loadFeed()">
+                                Refresh
+                            </button>
+                        </div>
+                        <div id="allChannelVideos" class="space-y-4">
+                            <div class="text-center text-gray-500 py-8">Loading...</div>
+                        </div>
+                    </div>
+                `;
+
+                // Get all channels
+                const response = await fetch('/api/channels', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch channels');
+                }
+
+                const channels = await response.json();
+                const allChannelVideos = document.getElementById('allChannelVideos');
+                
+                if (!channels || channels.length === 0) {
+                    allChannelVideos.innerHTML = '<div class="text-center text-gray-500 py-8">No channels found</div>';
+                    return;
+                }
+
+                // Fetch videos for each channel
+                const allVideos = [];
+                for (const channel of channels) {
+                    const videosResponse = await fetch(`/api/channels/${encodeURIComponent(channel.channelUrl)}/videos?limit=10`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (videosResponse.ok) {
+                        const videos = await videosResponse.json();
+                        allVideos.push(...videos);
+                    }
+                }
+
+                // Sort all videos by publishedAt date
+                allVideos.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+                if (allVideos.length === 0) {
+                    allChannelVideos.innerHTML = '<div class="text-center text-gray-500 py-8">No videos found</div>';
+                    return;
+                }
+
+                // Display all videos
+                allChannelVideos.innerHTML = allVideos.map(video => {
+                    const channelHandle = getChannelHandle(video.channelUrl);
+                    const initials = getInitials(channelHandle);
+                    return `
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <div class="flex items-center space-x-3 mb-4">
+                                ${video.profilePictureUrl ? 
+                                    `<img src="${video.profilePictureUrl}" 
+                                          alt="${channelHandle}" 
+                                          class="w-10 h-10 rounded-full object-cover"
+                                          onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium\'>${initials}</div>';">` :
+                                    `<div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">${initials}</div>`
+                                }
+                                <div>
+                                    <h4 class="text-lg font-medium text-gray-900">${video.title}</h4>
+                                    <p class="text-sm text-gray-500">
+                                        ${channelHandle} • 
+                                        ${new Date(video.publishedAt).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <div class="markdown-content">${marked.parse(video.summary)}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading all channel videos:', error);
+                const allChannelVideos = document.getElementById('allChannelVideos');
+                if (allChannelVideos) {
+                    allChannelVideos.innerHTML = `<div class="text-center text-red-500 py-8">Error: ${error.message}</div>`;
+                }
+            }
         });
     </script>
 </body>

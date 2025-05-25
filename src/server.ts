@@ -9,7 +9,7 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { auth, setUsersCollection } from './middleware/auth';
-import { AuthRequest, User, Channel, Video } from './types';
+import { AuthRequest, User, Channel, Video, UserChannel, UserVideoSummary } from './types';
 import { SUBSCRIPTION_PLANS, STRIPE_CONFIG } from './config';
 import Stripe from 'stripe';
 import { getStripeConfig } from './config';
@@ -46,6 +46,7 @@ let client: MongoClient;
 let db: any;
 let usersCollection: any;
 let channelsCollection: any;
+let userChannelsCollection: any;
 let videosCollection: any;
 let userVideoSummariesCollection: any;
 
@@ -60,6 +61,7 @@ async function connectToMongo() {
     db = client.db('youtube_summaries');
     usersCollection = db.collection('users');
     channelsCollection = db.collection('channels');
+    userChannelsCollection = db.collection('user_channels');
     videosCollection = db.collection('videos');
     userVideoSummariesCollection = db.collection('user_video_summaries');
     
@@ -244,77 +246,102 @@ app.post('/api/channels', auth, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Channel URL is required' });
     }
 
-    // Check if channel already exists for this user
-    const existingChannel = await channelsCollection.findOne({ 
-      channelUrl,
-      userId: new ObjectId(req.user?.userId)
+    if (!req.user?.email) {
+      return res.status(401).json({ error: 'User email not found' });
+    }
+
+    // Get channel ID
+    const channelId = await getChannelId(channelUrl);
+    if (!channelId) {
+      return res.status(400).json({ error: 'Invalid channel URL' });
+    }
+
+    // Get channel info from YouTube
+    const response = await youtube.channels.list({
+      part: ['snippet'],
+      id: [channelId]
     });
-    if (existingChannel) {
+    
+    const channelInfo = response.data.items?.[0];
+    if (!channelInfo) {
+      return res.status(400).json({ error: 'Channel not found' });
+    }
+
+    const channelHandle = channelInfo.snippet?.customUrl || channelInfo.snippet?.title;
+    if (!channelHandle) {
+      return res.status(400).json({ error: 'Could not get channel handle' });
+    }
+
+    // Check if channel already exists in channels collection
+    let channel = await channelsCollection.findOne({ channelHandle });
+    
+    if (!channel) {
+      // Create new channel
+      channel = {
+        channelUrl,
+        channelId,
+        channelHandle,
+        profilePictureUrl: channelInfo.snippet?.thumbnails?.default?.url,
+        lastAdded: new Date(),
+        createdAt: new Date()
+      };
+
+      await channelsCollection.insertOne(channel);
+    } else {
+      // Update lastAdded timestamp
+      await channelsCollection.updateOne(
+        { _id: channel._id },
+        { $set: { lastAdded: new Date() } }
+      );
+    }
+
+    // Check if user already has this channel
+    const existingUserChannel = await userChannelsCollection.findOne({
+      userEmail: req.user.email,
+      channelHandle
+    });
+
+    if (existingUserChannel) {
       return res.status(400).json({ error: 'Channel already exists' });
     }
 
-    // Store the channel
-    const channelInfo: Channel = {
-      channelUrl,
-      userId: new ObjectId(req.user?.userId),
+    // Create user-channel relationship
+    const userChannel: UserChannel = {
+      userEmail: req.user.email,
+      channelHandle,
       createdAt: new Date()
     };
 
-    await channelsCollection.insertOne(channelInfo);
-    res.json(channelInfo);
+    await userChannelsCollection.insertOne(userChannel);
+    res.json({ ...channel, _id: userChannel._id });
   } catch (error) {
     console.error('Error adding channel:', error);
     res.status(500).json({ error: 'Failed to add channel' });
   }
 });
 
-// Add new interface for channel info
-interface ChannelInfo {
-    channelUrl: string;
-    channelHandle: string;
-    profilePictureUrl: string;
-}
-
 // Update the channels endpoint to include profile picture
 app.get('/api/channels', auth, async (req: AuthRequest, res: Response) => {
     try {
-        const channels = await channelsCollection.find({ 
-            userId: new ObjectId(req.user?.userId)
-        }).toArray();
-        
-        // Get channel info including profile pictures
-        const channelsWithInfo = await Promise.all(channels.map(async (channel: Channel) => {
-            try {
-                // Get the channel ID first
-                const channelId = await getChannelId(channel.channelUrl);
-                if (!channelId) {
-                    console.error('Could not get channel ID for:', channel.channelUrl);
-                    return {
-                        ...channel,
-                        profilePictureUrl: null
-                    };
-                }
+        if (!req.user?.email) {
+            return res.status(401).json({ error: 'User email not found' });
+        }
 
-                const response = await youtube.channels.list({
-                    part: ['snippet'],
-                    id: [channelId]
-                });
-                
-                const channelInfo = response.data.items?.[0];
-                return {
-                    ...channel,
-                    profilePictureUrl: channelInfo?.snippet?.thumbnails?.default?.url || null
-                };
-            } catch (error) {
-                console.error('Error fetching channel info:', error);
-                return {
-                    ...channel,
-                    profilePictureUrl: null
-                };
-            }
+        // Get user's channels through the user_channels collection
+        const userChannels = await userChannelsCollection.find({ 
+            userEmail: req.user.email
+        }).toArray();
+
+        // Get the actual channel data for each user channel
+        const channels = await Promise.all(userChannels.map(async (userChannel: UserChannel) => {
+            const channel = await channelsCollection.findOne({ channelHandle: userChannel.channelHandle });
+            return {
+                ...channel,
+                _id: userChannel._id // Use the user_channel ID for frontend operations
+            };
         }));
 
-        res.json(channelsWithInfo);
+        res.json(channels);
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Failed to fetch channels' });
@@ -323,14 +350,34 @@ app.get('/api/channels', auth, async (req: AuthRequest, res: Response) => {
 
 app.delete('/api/channels/:channelUrl', auth, async (req: AuthRequest, res: Response) => {
   try {
+    if (!req.user?.email) {
+      return res.status(401).json({ error: 'User email not found' });
+    }
+
     const { channelUrl } = req.params;
-    const result = await channelsCollection.deleteOne({ 
-      channelUrl,
-      userId: new ObjectId(req.user?.userId)
+
+    // Find the channel
+    const channel = await channelsCollection.findOne({ channelUrl });
+    if (!channel) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    // Delete the user-channel relationship
+    const result = await userChannelsCollection.deleteOne({ 
+      channelHandle: channel.channelHandle,
+      userEmail: req.user.email
     });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    // Check if any other users have this channel
+    const remainingUsers = await userChannelsCollection.countDocuments({ channelHandle: channel.channelHandle });
+    
+    // If no users have this channel, delete it from channels collection
+    if (remainingUsers === 0) {
+      await channelsCollection.deleteOne({ _id: channel._id });
     }
 
     res.json({ message: 'Channel removed successfully' });
@@ -405,10 +452,13 @@ app.get('/api/channels/:channelUrl/videos', auth, async (req: AuthRequest, res: 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Get recent videos from database
+    // Get recent videos from database, sorted by publishedAt
     const videos = await videosCollection.find(
       { channelUrl },
-      { sort: { createdAt: -1 }, limit }
+      { 
+        sort: { publishedAt: -1 },
+        limit 
+      }
     ).toArray();
 
     // Check if we have any videos from today
@@ -490,7 +540,7 @@ async function getVideoIdFromUrl(videoUrl: string): Promise<string | null> {
 }
 
 // Get video details from YouTube API
-async function getVideoDetails(videoId: string) {
+async function getVideoDetails(videoId: string): Promise<{ videoId: string; title: string; publishedAt: string; } | null> {
   try {
     const response = await youtube.videos.list({
       part: ['snippet'],
@@ -498,7 +548,7 @@ async function getVideoDetails(videoId: string) {
     });
 
     const video = response.data.items?.[0];
-    if (!video?.snippet) {
+    if (!video?.snippet?.title || !video?.snippet?.publishedAt) {
       return null;
     }
 
@@ -521,6 +571,10 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: 'Video URL is required' });
     }
 
+    if (!req.user?.email) {
+      return res.status(401).json({ error: 'User email not found' });
+    }
+
     const videoId = await getVideoIdFromUrl(videoUrl);
     if (!videoId) {
       return res.status(400).json({ error: 'Invalid YouTube video URL' });
@@ -528,7 +582,7 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
 
     // First check if we already have this summary in user's history
     const existingUserSummary = await userVideoSummariesCollection.findOne({
-      userId: new ObjectId(req.user?.userId),
+      userEmail: req.user.email,
       videoId
     });
 
@@ -543,12 +597,13 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
 
     if (existingChannelVideo) {
       // Create a copy in user's history
-      const videoSummary = {
-        userId: new ObjectId(req.user?.userId),
+      const videoSummary: UserVideoSummary = {
+        userEmail: req.user.email,
         videoId,
         title: existingChannelVideo.title,
         publishedAt: existingChannelVideo.publishedAt,
         summary: existingChannelVideo.summary,
+        transcript: existingChannelVideo.transcript || undefined,
         createdAt: new Date()
       };
 
@@ -558,8 +613,8 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
 
     // If no existing summary found, get video details and generate new summary
     const videoData = await getVideoDetails(videoId);
-    if (!videoData) {
-      return res.status(404).json({ error: 'Video not found' });
+    if (!videoData || !videoData.title || !videoData.publishedAt) {
+      return res.status(404).json({ error: 'Video not found or missing required information' });
     }
 
     // Generate summary
@@ -572,13 +627,13 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
     }
 
     // Save to database
-    const videoSummary = {
-      userId: new ObjectId(req.user?.userId),
+    const videoSummary: UserVideoSummary = {
+      userEmail: req.user.email,
       videoId,
       title: videoData.title,
       publishedAt: videoData.publishedAt,
       summary: result.summary,
-      transcript: result.transcript,
+      transcript: result.transcript || undefined,
       createdAt: new Date()
     };
 
@@ -593,8 +648,12 @@ app.post('/api/videos/summary', auth, async (req: AuthRequest, res: Response) =>
 // Get user's video summary history
 app.get('/api/videos/summaries', auth, async (req: AuthRequest, res: Response) => {
   try {
+    if (!req.user?.email) {
+      return res.status(401).json({ error: 'User email not found' });
+    }
+
     const limit = parseInt(req.query.limit as string) || 0;
-    const query = { userId: new ObjectId(req.user?.userId) };
+    const query = { userEmail: req.user.email };
     const options = { 
       sort: { createdAt: -1 },
       ...(limit > 0 && { limit })
@@ -738,13 +797,26 @@ ${text}`
 // Add new endpoint for the feed
 app.get('/api/feed', auth, async (req: AuthRequest, res: Response) => {
     try {
-        // Get all channels for the user
-        const channels = await channelsCollection.find({ 
-            userId: new ObjectId(req.user?.userId)
+        if (!req.user?.email) {
+            return res.status(401).json({ error: 'User email not found' });
+        }
+
+        // Get user's channels through the user_channels collection
+        const userChannels = await userChannelsCollection.find({ 
+            userEmail: req.user.email
         }).toArray();
+
+        // Get the actual channel data for each user channel
+        const channels = await Promise.all(userChannels.map(async (userChannel: UserChannel) => {
+            const channel = await channelsCollection.findOne({ channelHandle: userChannel.channelHandle });
+            return channel;
+        }));
+
+        // Filter out any null channels
+        const validChannels = channels.filter((channel): channel is Channel => channel !== null);
         
         // Get the latest video from each channel
-        const latestVideos = await Promise.all(channels.map(async (channel: Channel) => {
+        const latestVideos = await Promise.all(validChannels.map(async (channel: Channel) => {
             try {
                 // First check if we have recent videos in the database
                 const recentVideos = await videosCollection.find(
@@ -936,6 +1008,10 @@ app.get('/success', (req, res) => {
 app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
     console.log('User in /api/account/usage:', req.user);
     try {
+        if (!req.user?.email) {
+            return res.status(401).json({ error: 'User email not found' });
+        }
+
         const user = await usersCollection.findOne({ _id: new ObjectId(req.user?.userId) });
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -950,14 +1026,14 @@ app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        // Count channels
-        const channelsCount = await channelsCollection.countDocuments({
-            userId: new ObjectId(req.user?.userId)
+        // Count channels using user_channels collection
+        const channelsCount = await userChannelsCollection.countDocuments({
+            userEmail: req.user.email
         });
 
-        // Count videos this month
-        const videosThisMonth = await videosCollection.countDocuments({
-            userId: new ObjectId(req.user?.userId),
+        // Count videos this month using user_video_summaries collection
+        const videosThisMonth = await userVideoSummariesCollection.countDocuments({
+            userEmail: req.user.email,
             createdAt: { $gte: startOfMonth }
         });
 
@@ -1024,7 +1100,8 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
                             subscriptionStatus: 'active',
                             stripeSubscriptionId: session.subscription as string,
                             currentPeriodEnd: nextBillingDate,
-                            promoCode: promoCode // Store the promo code
+                            subscriptionStartDate: new Date(),
+                            promoCode: promoCode
                         }
                     }
                 );
@@ -1157,6 +1234,7 @@ app.post('/api/subscription/verify', auth, async (req: AuthRequest, res: Respons
                     stripeSubscriptionId: subscriptionId,
                     tier: planId,
                     currentPeriodEnd: nextBillingDate,
+                    subscriptionStartDate: new Date(),
                     promoCode: promoCode
                 }
             }
@@ -1177,6 +1255,89 @@ app.post('/api/subscription/verify', auth, async (req: AuthRequest, res: Respons
         console.error('Error verifying subscription:', error);
         res.status(500).json({ error: 'Error verifying subscription' });
     }
+});
+
+// Add subscription status endpoint
+app.get('/api/subscription/status', auth, async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            subscriptionStatus: user.subscriptionStatus,
+            tier: user.tier,
+            currentPeriodEnd: user.currentPeriodEnd,
+            subscriptionStartDate: user.subscriptionStartDate
+        });
+    } catch (error) {
+        console.error('Error checking subscription status:', error);
+        res.status(500).json({ error: 'Failed to check subscription status' });
+    }
+});
+
+// Add search endpoint
+app.get('/api/search', auth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user?.email) {
+      return res.status(401).json({ error: 'User email not found' });
+    }
+
+    const { query, type = 'all' } = req.query;
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const searchQuery = query.toString().toLowerCase();
+    let results: (UserVideoSummary | Video & { source: string })[] = [];
+
+    // Search in user's summarized videos
+    if (type === 'all' || type === 'history') {
+      const userSummaries = await userVideoSummariesCollection.find({
+        userEmail: req.user.email,
+        $or: [
+          { title: { $regex: searchQuery, $options: 'i' } },
+          { summary: { $regex: searchQuery, $options: 'i' } }
+        ]
+      }).toArray();
+
+      results = results.concat(userSummaries.map((summary: UserVideoSummary) => ({
+        ...summary,
+        source: 'history'
+      })));
+    }
+
+    // Search in channel videos
+    if (type === 'all' || type === 'channels') {
+      // Get user's channels
+      const userChannels = await userChannelsCollection.find({
+        userEmail: req.user.email
+      }).toArray();
+
+      // Get videos from user's channels
+      const channelVideos = await videosCollection.find({
+        channelHandle: { $in: userChannels.map((uc: UserChannel) => uc.channelHandle) },
+        $or: [
+          { title: { $regex: searchQuery, $options: 'i' } },
+          { summary: { $regex: searchQuery, $options: 'i' } }
+        ]
+      }).toArray();
+
+      results = results.concat(channelVideos.map((video: Video) => ({
+        ...video,
+        source: 'channel'
+      })));
+    }
+
+    // Sort results by creation date
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error searching videos:', error);
+    res.status(500).json({ error: 'Failed to search videos' });
+  }
 });
 
 // Static files (should be last)

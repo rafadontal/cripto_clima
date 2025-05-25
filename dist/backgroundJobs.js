@@ -15,27 +15,20 @@ async function initializeCollections(client) {
 }
 // Rate limiting configuration
 const RATE_LIMIT = {
-    maxRequests: 100, // YouTube API quota per day
-    timeWindow: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-    requestsPerBatch: 5, // Number of channels to process in each batch
-    batchInterval: 15 * 60 * 1000, // 15 minutes between batches
+    requestsPerBatch: 10,
+    batchInterval: 15 * 60 * 1000 // 15 minutes
 };
-// Track API usage
-let apiUsage = {
-    requests: 0,
-    lastReset: Date.now(),
-};
-function resetApiUsage() {
-    const now = Date.now();
-    if (now - apiUsage.lastReset >= RATE_LIMIT.timeWindow) {
-        apiUsage.requests = 0;
-        apiUsage.lastReset = now;
+async function processChannelBatch(channels) {
+    for (const channel of channels) {
+        await checkChannelForNewVideos(channel);
+        // Update lastUpdated timestamp
+        await channelsCollection.updateOne({ _id: channel._id }, { $set: { lastUpdated: new Date() } });
     }
 }
 async function checkChannelForNewVideos(channel) {
     try {
         // Get channel ID
-        const channelId = await (0, server_2.getChannelId)(channel.channelUrl);
+        const channelId = channel.channelId || await (0, server_2.getChannelId)(channel.channelUrl);
         if (!channelId) {
             console.error(`Could not get channel ID for: ${channel.channelUrl}`);
             return;
@@ -80,21 +73,6 @@ async function checkChannelForNewVideos(channel) {
     }
     catch (error) {
         console.error(`Error checking channel ${channel.channelUrl}:`, error);
-    }
-}
-async function processChannelBatch(channels) {
-    for (const channel of channels) {
-        resetApiUsage();
-        if (apiUsage.requests >= RATE_LIMIT.maxRequests) {
-            console.log('API quota reached, waiting for next day');
-            return;
-        }
-        await checkChannelForNewVideos(channel);
-        apiUsage.requests++;
-        // Update lastUpdated timestamp
-        await channelsCollection.updateOne({ _id: channel._id }, { $set: { lastUpdated: new Date() } });
-        // Add a small delay between requests to avoid hitting rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
     }
 }
 async function startBackgroundJobs() {
