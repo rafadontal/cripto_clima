@@ -1,6 +1,18 @@
+import dotenv from 'dotenv';
+
+// Load environment variables with override
+dotenv.config({ override: true });
+
+// Debug: Log all environment variables (safely)
+console.log('Environment variables loaded:');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
+console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
+console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
+console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY?.substring(0, 8) + '...');
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { MongoClient, ObjectId } from 'mongodb';
 import { OpenAI } from 'openai';
 import { google } from 'googleapis';
@@ -13,16 +25,7 @@ import { AuthRequest, User, Channel, Video, UserChannel, UserVideoSummary } from
 import { SUBSCRIPTION_PLANS, STRIPE_CONFIG } from './config';
 import Stripe from 'stripe';
 import { getStripeConfig } from './config';
-
-// Load environment variables with override
-dotenv.config({ override: true });
-
-// Debug: Log all environment variables (safely)
-console.log('Environment variables loaded:');
-console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
-console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
-console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
-console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
+import { sendWelcomeEmail, sendPaymentSuccessEmail, sendPaymentFailedEmail, sendPasswordResetEmail } from './services/email';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -189,6 +192,9 @@ app.post('/api/register', async (req: Request, res: Response) => {
 
     const result = await usersCollection.insertOne(user);
     const token = jwt.sign({ userId: result.insertedId.toString(), email }, JWT_SECRET);
+
+    // Send welcome email
+    await sendWelcomeEmail(email, email.split('@')[0]);
 
     res.status(201).json({ token });
   } catch (error) {
@@ -1092,6 +1098,13 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
                     promoCode = discount.promotion_code?.code || discount.coupon?.id;
                 }
 
+                // Get user information
+                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+                if (!user) {
+                    throw new Error('User not found');
+                }
+
+                // Update user subscription
                 await usersCollection.updateOne(
                     { _id: new ObjectId(userId) },
                     {
@@ -1105,41 +1118,23 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
                         }
                     }
                 );
+
+                // Send payment success email
+                await sendPaymentSuccessEmail(user.email, user.name || user.email.split('@')[0], plan.name);
+
                 break;
             }
 
-            case 'customer.subscription.updated':
-            case 'customer.subscription.deleted': {
-                const subscription = event.data.object as Stripe.Subscription;
-                const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
-                const userId = customer.metadata?.userId;
+            case 'checkout.session.expired': {
+                const session = event.data.object as Stripe.Checkout.Session;
+                const userId = session.metadata?.userId;
 
-                if (!userId) {
-                    throw new Error('Missing user ID');
-                }
-
-                if (subscription.status === 'active') {
-                    const nextBillingDate = new Date((subscription as any).current_period_end * 1000);
-                    await usersCollection.updateOne(
-                        { _id: new ObjectId(userId) },
-                        {
-                            $set: {
-                                subscriptionStatus: 'active',
-                                currentPeriodEnd: nextBillingDate
-                            }
-                        }
-                    );
-                } else {
-                    await usersCollection.updateOne(
-                        { _id: new ObjectId(userId) },
-                        {
-                            $set: {
-                                subscriptionStatus: subscription.status,
-                                tier: 'basic', // Downgrade to basic tier
-                                currentPeriodEnd: null // Clear the next billing date
-                            }
-                        }
-                    );
+                if (userId) {
+                    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+                    if (user) {
+                        // Send payment failed email
+                        await sendPaymentFailedEmail(user.email, user.name || user.email.split('@')[0]);
+                    }
                 }
                 break;
             }
@@ -1338,6 +1333,78 @@ app.get('/api/search', auth, async (req: AuthRequest, res: Response) => {
     console.error('Error searching videos:', error);
     res.status(500).json({ error: 'Failed to search videos' });
   }
+});
+
+// Add password reset request endpoint
+app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+        
+        // Find user
+        const user = await usersCollection.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+
+        // Generate reset token
+        const resetToken = jwt.sign(
+            { userId: user._id.toString(), email },
+            JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Store reset token in user document
+        await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: { resetToken, resetTokenExpires: new Date(Date.now() + 3600000) } }
+        );
+
+        // Send reset email
+        await sendPasswordResetEmail(email, resetToken);
+
+        res.json({ message: 'Email de redefinição de senha enviado' });
+    } catch (error) {
+        console.error('Error sending reset email:', error);
+        res.status(500).json({ error: 'Erro ao enviar email de redefinição' });
+    }
+});
+
+// Add password reset endpoint
+app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+    try {
+        const { token, password } = req.body;
+
+        // Verify token
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string, email: string };
+        
+        // Find user
+        const user = await usersCollection.findOne({
+            _id: new ObjectId(decoded.userId),
+            resetToken: token,
+            resetTokenExpires: { $gt: new Date() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Token inválido ou expirado' });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Update password and clear reset token
+        await usersCollection.updateOne(
+            { _id: user._id },
+            {
+                $set: { password: hashedPassword },
+                $unset: { resetToken: "", resetTokenExpires: "" }
+            }
+        );
+
+        res.json({ message: 'Senha atualizada com sucesso' });
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Erro ao redefinir senha' });
+    }
 });
 
 // Static files (should be last)

@@ -27,6 +27,8 @@ export interface User {
     subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid';
     currentPeriodEnd?: Date;
     promoCode?: string | null;
+    resetToken?: string;
+    resetTokenExpires?: Date;
 }
 
 export interface UsageStats {

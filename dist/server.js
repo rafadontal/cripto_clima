@@ -6,9 +6,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.youtube = void 0;
 exports.getChannelId = getChannelId;
 exports.generateSummary = generateSummary;
+const dotenv_1 = __importDefault(require("dotenv"));
+// Load environment variables with override
+dotenv_1.default.config({ override: true });
+// Debug: Log all environment variables (safely)
+console.log('Environment variables loaded:');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
+console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
+console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
+console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY?.substring(0, 8) + '...');
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const dotenv_1 = __importDefault(require("dotenv"));
 const mongodb_1 = require("mongodb");
 const openai_1 = require("openai");
 const googleapis_1 = require("googleapis");
@@ -20,14 +29,7 @@ const auth_1 = require("./middleware/auth");
 const config_1 = require("./config");
 const stripe_1 = __importDefault(require("stripe"));
 const config_2 = require("./config");
-// Load environment variables with override
-dotenv_1.default.config({ override: true });
-// Debug: Log all environment variables (safely)
-console.log('Environment variables loaded:');
-console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
-console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
-console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
-console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
+const email_1 = require("./services/email");
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -158,6 +160,8 @@ app.post('/api/register', async (req, res) => {
         };
         const result = await usersCollection.insertOne(user);
         const token = jsonwebtoken_1.default.sign({ userId: result.insertedId.toString(), email }, JWT_SECRET);
+        // Send welcome email
+        await (0, email_1.sendWelcomeEmail)(email, email.split('@')[0]);
         res.status(201).json({ token });
     }
     catch (error) {
@@ -926,6 +930,12 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                     const discount = session.total_details.breakdown.discounts[0];
                     promoCode = discount.promotion_code?.code || discount.coupon?.id;
                 }
+                // Get user information
+                const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(userId) });
+                if (!user) {
+                    throw new Error('User not found');
+                }
+                // Update user subscription
                 await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
                     $set: {
                         tier: plan.tier,
@@ -936,33 +946,19 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                         promoCode: promoCode
                     }
                 });
+                // Send payment success email
+                await (0, email_1.sendPaymentSuccessEmail)(user.email, user.name || user.email.split('@')[0], plan.name);
                 break;
             }
-            case 'customer.subscription.updated':
-            case 'customer.subscription.deleted': {
-                const subscription = event.data.object;
-                const customer = await stripe.customers.retrieve(subscription.customer);
-                const userId = customer.metadata?.userId;
-                if (!userId) {
-                    throw new Error('Missing user ID');
-                }
-                if (subscription.status === 'active') {
-                    const nextBillingDate = new Date(subscription.current_period_end * 1000);
-                    await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
-                        $set: {
-                            subscriptionStatus: 'active',
-                            currentPeriodEnd: nextBillingDate
-                        }
-                    });
-                }
-                else {
-                    await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
-                        $set: {
-                            subscriptionStatus: subscription.status,
-                            tier: 'basic', // Downgrade to basic tier
-                            currentPeriodEnd: null // Clear the next billing date
-                        }
-                    });
+            case 'checkout.session.expired': {
+                const session = event.data.object;
+                const userId = session.metadata?.userId;
+                if (userId) {
+                    const user = await usersCollection.findOne({ _id: new mongodb_1.ObjectId(userId) });
+                    if (user) {
+                        // Send payment failed email
+                        await (0, email_1.sendPaymentFailedEmail)(user.email, user.name || user.email.split('@')[0]);
+                    }
                 }
                 break;
             }
@@ -1131,6 +1127,57 @@ app.get('/api/search', auth_1.auth, async (req, res) => {
     catch (error) {
         console.error('Error searching videos:', error);
         res.status(500).json({ error: 'Failed to search videos' });
+    }
+});
+// Add password reset request endpoint
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        // Find user
+        const user = await usersCollection.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+        // Generate reset token
+        const resetToken = jsonwebtoken_1.default.sign({ userId: user._id.toString(), email }, JWT_SECRET, { expiresIn: '1h' });
+        // Store reset token in user document
+        await usersCollection.updateOne({ _id: user._id }, { $set: { resetToken, resetTokenExpires: new Date(Date.now() + 3600000) } });
+        // Send reset email
+        await (0, email_1.sendPasswordResetEmail)(email, resetToken);
+        res.json({ message: 'Email de redefinição de senha enviado' });
+    }
+    catch (error) {
+        console.error('Error sending reset email:', error);
+        res.status(500).json({ error: 'Erro ao enviar email de redefinição' });
+    }
+});
+// Add password reset endpoint
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+        // Verify token
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        // Find user
+        const user = await usersCollection.findOne({
+            _id: new mongodb_1.ObjectId(decoded.userId),
+            resetToken: token,
+            resetTokenExpires: { $gt: new Date() }
+        });
+        if (!user) {
+            return res.status(400).json({ error: 'Token inválido ou expirado' });
+        }
+        // Hash new password
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        // Update password and clear reset token
+        await usersCollection.updateOne({ _id: user._id }, {
+            $set: { password: hashedPassword },
+            $unset: { resetToken: "", resetTokenExpires: "" }
+        });
+        res.json({ message: 'Senha atualizada com sucesso' });
+    }
+    catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Erro ao redefinir senha' });
     }
 });
 // Static files (should be last)

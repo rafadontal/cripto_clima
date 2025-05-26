@@ -17,7 +17,7 @@ const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
 async function sendEmail({ to, subject, html }) {
     try {
         const data = await resend.emails.send({
-            from: 'ResumoTube <noreply@resumotube.com>',
+            from: 'ResumoTube <noreply@resumotube.com.br>',
             to,
             subject,
             html

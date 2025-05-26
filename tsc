@@ -1,0 +1,33 @@
+
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; name: string; googleId: string | undefined; createdAt: Date; tier: "basic"; subscriptionStatus: "u
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; name: string; googleId: string | undefined; createdAt: Date; tier: "basic"; subscriptionStatus: "unpaid"; }' but required in type 'User'.
+
+142       const newUser: User = {
+                ~~~~~~~
+
+  src/types.ts:20:5
+    20     password: string;
+           ~~~~~~~~
+    'password' is declared here.
+
+
+Found 1 error in src/server.ts:142
+➜  resumotube git:(main) ✗ > youtube-summary-app@1.0.0 build
+zsh: command not found: build
+> tsc && cp -r public dist/                                                                     
+
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; name: string; googleId: string | undefined; createdAt: Date; tier: "basic"; subscriptionStatus: "u➜  resumotube git:(main) ✗ > youtube-summary-app@1.0.0 build
+zsh: command not found: build
+> tsc && cp -r public dist/                                                                     
+
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; name: string; googleId: string | undefined; createdAt: Date; tier: "basic"; subscriptionStatus: "u➜  resumotube git:(main) ✗ > youtube-summary-app@1.0.0 build
+zsh: command not found: build
+> tsc && cp -r public dist/                                                                     
+
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
+src/server.ts:142:13 - error TS2741: Property 'password' is missing in type '{ email: string; na
