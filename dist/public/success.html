@@ -55,24 +55,39 @@
                 }
 
                 if (verifyData.subscriptionStatus === 'active') {
-                    // Get a new token with updated subscription status
-                    const loginResponse = await fetch('/api/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            email: localStorage.getItem('userEmail'),
-                            password: localStorage.getItem('userPassword')
-                        })
-                    });
-
-                    if (!loginResponse.ok) {
-                        throw new Error('Falha ao autenticar após pagamento');
+                    // Store subscription info
+                    localStorage.setItem('subscriptionStatus', verifyData.subscriptionStatus);
+                    if (verifyData.promoCode) {
+                        localStorage.setItem('promoCode', verifyData.promoCode);
+                    }
+                    if (verifyData.nextBillingDate) {
+                        localStorage.setItem('nextBillingDate', verifyData.nextBillingDate);
                     }
 
-                    const loginData = await loginResponse.json();
-                    localStorage.setItem('token', loginData.token);
+                    // Wait a moment to ensure database is updated
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    // Get subscription status to confirm it's active
+                    const statusResponse = await fetch('/api/subscription/status', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (!statusResponse.ok) {
+                        throw new Error('Falha ao verificar status da assinatura');
+                    }
+
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusData.subscriptionStatus !== 'active') {
+                        throw new Error('Status da assinatura não atualizado corretamente');
+                    }
+
+                    // Store the updated status
+                    localStorage.setItem('tier', statusData.tier);
+                    localStorage.setItem('subscriptionStatus', statusData.subscriptionStatus);
+                    localStorage.setItem('currentPeriodEnd', statusData.currentPeriodEnd);
 
                     // Show success message with promo code info if available
                     const successMessage = document.querySelector('p.text-gray-600');

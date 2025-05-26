@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.3.0",
     "openai": "^4.20.1",
+    "resend": "^4.5.1",
     "stripe": "^18.1.0",
     "youtube-transcript": "^1.0.6"
   },

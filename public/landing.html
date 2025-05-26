@@ -135,6 +135,69 @@
             // Redirect to login
             window.location.href = '/login.html';
         }
+
+        // Handle plan selection
+        async function selectPlan(planId) {
+            try {
+                // Check if we have registration data
+                const registrationData = localStorage.getItem('registrationData');
+                const isFromRegistration = localStorage.getItem('isFromRegistration') === 'true';
+
+                if (isFromRegistration && registrationData) {
+                    // If coming from registration, create account first
+                    const { email, password } = JSON.parse(registrationData);
+                    const registerResponse = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    if (!registerResponse.ok) {
+                        throw new Error('Failed to create account');
+                    }
+
+                    const { token } = await registerResponse.json();
+                    localStorage.setItem('token', token);
+                }
+
+                // Get the current token (either from registration or existing)
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    // If no token, redirect to registration
+                    localStorage.setItem('selectedPlan', planId);
+                    window.location.href = '/register.html';
+                    return;
+                }
+
+                // Create checkout session
+                const response = await fetch('/api/subscription/create-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ planId })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create checkout session');
+                }
+
+                const { url } = await response.json();
+                window.location.href = url;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Erro ao processar seleção do plano. Por favor, tente novamente.');
+            }
+        }
+
+        // Clear registration data when leaving the page
+        window.addEventListener('beforeunload', () => {
+            localStorage.removeItem('registrationData');
+            localStorage.removeItem('isFromRegistration');
+        });
     </script>
 </body>
 </html> 
