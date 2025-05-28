@@ -55,6 +55,10 @@
                 }
 
                 if (verifyData.subscriptionStatus === 'active') {
+                    // Clean up localStorage
+                    localStorage.removeItem('selectedPlan');
+                    localStorage.removeItem('pendingCheckoutSession');
+
                     // Store subscription info
                     localStorage.setItem('subscriptionStatus', verifyData.subscriptionStatus);
                     if (verifyData.promoCode) {

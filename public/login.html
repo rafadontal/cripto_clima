@@ -172,7 +172,7 @@
         // Check if coming from plan selection
         const urlParams = new URLSearchParams(window.location.search);
         const selectedPlan = localStorage.getItem('selectedPlan');
-        const showRegister = selectedPlan || urlParams.get('plan');
+        const showRegister = false; // Always show login form by default
 
         // Tab switching
         const loginTab = document.getElementById('loginTab');
@@ -243,11 +243,19 @@
                     localStorage.setItem('userEmail', email);
                     localStorage.setItem('userPassword', password);
                     
-                    // Use the subscriptionStatus from the response
+                    // Check subscription status
                     if (data.subscriptionStatus === 'active') {
                         window.location.replace('/index.html');
                     } else {
-                        window.location.replace('/landing.html');
+                        // Show a message about needing a plan
+                        const successDiv = document.getElementById('success');
+                        successDiv.textContent = 'Você precisa selecionar um plano para continuar.';
+                        successDiv.classList.remove('hidden');
+                        
+                        // Redirect to plans page after a short delay
+                        setTimeout(() => {
+                            window.location.replace('/landing.html');
+                        }, 2000);
                     }
                 } else {
                     setLoading('loginButton', false);
@@ -290,22 +298,33 @@
 
                     // If coming from plan selection, proceed to checkout
                     if (selectedPlan) {
-                        const checkoutResponse = await fetch('/api/subscription/create-checkout', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${data.token}`
-                            },
-                            body: JSON.stringify({ planId: selectedPlan })
-                        });
+                        try {
+                            const checkoutResponse = await fetch('/api/subscription/create-checkout', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${data.token}`
+                                },
+                                body: JSON.stringify({ planId: selectedPlan })
+                            });
 
-                        if (checkoutResponse.ok) {
-                            const checkoutData = await checkoutResponse.json();
-                            if (checkoutData.url) {
-                                window.location.href = checkoutData.url;
+                            if (checkoutResponse.ok) {
+                                const checkoutData = await checkoutResponse.json();
+                                if (checkoutData.url) {
+                                    window.location.href = checkoutData.url;
+                                    return;
+                                }
                             }
+                            // If checkout fails, redirect to landing page
+                            window.location.replace('/landing.html');
+                        } catch (error) {
+                            console.error('Checkout error:', error);
+                            window.location.replace('/landing.html');
                         }
                     } else {
+                        // Store registration data for plan selection
+                        localStorage.setItem('isFromRegistration', 'true');
+                        localStorage.setItem('registrationData', JSON.stringify({ email, password }));
                         window.location.replace('/landing.html');
                     }
                 } else {

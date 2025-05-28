@@ -1060,25 +1060,33 @@ app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
 
 // Stripe webhook handler
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    console.log('Received webhook request');
     if (!stripe) {
+        console.error('Stripe is not initialized');
         return res.status(503).json({ error: 'Subscription service is currently unavailable' });
     }
     const sig = req.headers['stripe-signature'];
+    console.log('Stripe signature:', sig ? 'present' : 'missing');
 
     try {
+        console.log('Constructing webhook event...');
         const event = stripe.webhooks.constructEvent(
             req.body,
             sig as string,
             getStripeConfig().webhookSecret
         );
+        console.log('Webhook event type:', event.type);
 
         switch (event.type) {
             case 'checkout.session.completed': {
+                console.log('Processing checkout.session.completed event');
                 const session = event.data.object as Stripe.Checkout.Session;
                 const userId = session.metadata?.userId;
                 const planId = session.metadata?.planId;
+                console.log('Session metadata:', { userId, planId });
 
                 if (!userId || !planId) {
+                    console.error('Missing metadata in session:', session.metadata);
                     throw new Error('Missing metadata');
                 }
 
@@ -1104,6 +1112,9 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
                     throw new Error('User not found');
                 }
 
+                // Calculate the final amount paid (after any discounts)
+                const amountPaid = session.amount_total ? session.amount_total / 100 : plan.price;
+
                 // Update user subscription
                 await usersCollection.updateOne(
                     { _id: new ObjectId(userId) },
@@ -1119,8 +1130,8 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
                     }
                 );
 
-                // Send payment success email
-                await sendPaymentSuccessEmail(user.email, user.name || user.email.split('@')[0], plan.name);
+                // Send payment success email with amount
+                await sendPaymentSuccessEmail(user.email, user.name || user.email.split('@')[0], plan.name, amountPaid);
 
                 break;
             }
@@ -1238,6 +1249,29 @@ app.post('/api/subscription/verify', auth, async (req: AuthRequest, res: Respons
         if (updateResult.modifiedCount === 0) {
             console.error('Failed to update user subscription status');
             return res.status(500).json({ error: 'Failed to update subscription status' });
+        }
+
+        // Get plan details for email
+        const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+        if (!plan) {
+            console.error('Plan not found for ID:', planId);
+        } else {
+            // Calculate amount paid
+            const amountPaid = session.amount_total ? session.amount_total / 100 : plan.price;
+            
+            // Send payment success email
+            try {
+                await sendPaymentSuccessEmail(
+                    user.email,
+                    user.name || user.email.split('@')[0],
+                    plan.name,
+                    amountPaid
+                );
+                console.log('Payment success email sent from verify endpoint');
+            } catch (emailError) {
+                console.error('Error sending payment success email:', emailError);
+                // Don't fail the request if email fails
+            }
         }
 
         res.json({ 

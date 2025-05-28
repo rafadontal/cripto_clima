@@ -43,8 +43,8 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.url) {
-                        // Clear the selected plan from storage
-                        localStorage.removeItem('selectedPlan');
+                        // Store the session ID for later use
+                        localStorage.setItem('pendingCheckoutSession', data.sessionId);
                         // Redirect to Stripe checkout
                         window.location.href = data.url;
                     } else {

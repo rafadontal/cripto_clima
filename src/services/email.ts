@@ -48,9 +48,14 @@ export async function sendWelcomeEmail(email: string, name: string) {
     }
 }
 
-export async function sendPaymentSuccessEmail(email: string, name: string, planName: string) {
+export async function sendPaymentSuccessEmail(email: string, name: string, planName: string, amount?: number) {
     console.log(`Attempting to send payment success email to ${email} for plan ${planName}...`);
     try {
+        const formattedAmount = amount ? new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(amount) : '';
+
         const response = await getResend().emails.send({
             from: 'ResumoTube <noreply@resumotube.com.br>',
             to: email,
@@ -60,6 +65,13 @@ export async function sendPaymentSuccessEmail(email: string, name: string, planN
                     <h1 style="color: #4F46E5;">Pagamento Confirmado!</h1>
                     <p>Olá ${name},</p>
                     <p>Seu pagamento para o plano ${planName} foi confirmado com sucesso!</p>
+                    ${amount ? `<p>Valor pago: ${formattedAmount}</p>` : ''}
+                    <p>Detalhes da sua assinatura:</p>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 10px 0;">✓ Plano: ${planName}</li>
+                        <li style="margin: 10px 0;">✓ Status: Ativo</li>
+                        <li style="margin: 10px 0;">✓ Próxima cobrança: Em 30 dias</li>
+                    </ul>
                     <p>Agora você tem acesso completo a todas as funcionalidades do ResumoTube.</p>
                     <p>Se você tiver alguma dúvida, não hesite em nos contatar.</p>
                     <p>Atenciosamente,<br>Equipe ResumoTube</p>
@@ -73,7 +85,8 @@ export async function sendPaymentSuccessEmail(email: string, name: string, planN
             stack: error instanceof Error ? error.stack : undefined,
             email,
             name,
-            planName
+            planName,
+            amount
         });
         throw error;
     }

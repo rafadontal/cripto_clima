@@ -51,9 +51,13 @@ async function sendWelcomeEmail(email, name) {
         throw error; // Re-throw to handle it in the calling function
     }
 }
-async function sendPaymentSuccessEmail(email, name, planName) {
+async function sendPaymentSuccessEmail(email, name, planName, amount) {
     console.log(`Attempting to send payment success email to ${email} for plan ${planName}...`);
     try {
+        const formattedAmount = amount ? new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(amount) : '';
         const response = await getResend().emails.send({
             from: 'ResumoTube <noreply@resumotube.com.br>',
             to: email,
@@ -63,6 +67,13 @@ async function sendPaymentSuccessEmail(email, name, planName) {
                     <h1 style="color: #4F46E5;">Pagamento Confirmado!</h1>
                     <p>Olá ${name},</p>
                     <p>Seu pagamento para o plano ${planName} foi confirmado com sucesso!</p>
+                    ${amount ? `<p>Valor pago: ${formattedAmount}</p>` : ''}
+                    <p>Detalhes da sua assinatura:</p>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 10px 0;">✓ Plano: ${planName}</li>
+                        <li style="margin: 10px 0;">✓ Status: Ativo</li>
+                        <li style="margin: 10px 0;">✓ Próxima cobrança: Em 30 dias</li>
+                    </ul>
                     <p>Agora você tem acesso completo a todas as funcionalidades do ResumoTube.</p>
                     <p>Se você tiver alguma dúvida, não hesite em nos contatar.</p>
                     <p>Atenciosamente,<br>Equipe ResumoTube</p>
@@ -77,7 +88,8 @@ async function sendPaymentSuccessEmail(email, name, planName) {
             stack: error instanceof Error ? error.stack : undefined,
             email,
             name,
-            planName
+            planName,
+            amount
         });
         throw error;
     }

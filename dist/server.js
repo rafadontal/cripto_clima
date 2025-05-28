@@ -903,18 +903,26 @@ app.get('/api/account/usage', auth_1.auth, async (req, res) => {
 });
 // Stripe webhook handler
 app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
+    console.log('Received webhook request');
     if (!stripe) {
+        console.error('Stripe is not initialized');
         return res.status(503).json({ error: 'Subscription service is currently unavailable' });
     }
     const sig = req.headers['stripe-signature'];
+    console.log('Stripe signature:', sig ? 'present' : 'missing');
     try {
+        console.log('Constructing webhook event...');
         const event = stripe.webhooks.constructEvent(req.body, sig, (0, config_2.getStripeConfig)().webhookSecret);
+        console.log('Webhook event type:', event.type);
         switch (event.type) {
             case 'checkout.session.completed': {
+                console.log('Processing checkout.session.completed event');
                 const session = event.data.object;
                 const userId = session.metadata?.userId;
                 const planId = session.metadata?.planId;
+                console.log('Session metadata:', { userId, planId });
                 if (!userId || !planId) {
+                    console.error('Missing metadata in session:', session.metadata);
                     throw new Error('Missing metadata');
                 }
                 const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
@@ -935,6 +943,8 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                 if (!user) {
                     throw new Error('User not found');
                 }
+                // Calculate the final amount paid (after any discounts)
+                const amountPaid = session.amount_total ? session.amount_total / 100 : plan.price;
                 // Update user subscription
                 await usersCollection.updateOne({ _id: new mongodb_1.ObjectId(userId) }, {
                     $set: {
@@ -946,8 +956,8 @@ app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), as
                         promoCode: promoCode
                     }
                 });
-                // Send payment success email
-                await (0, email_1.sendPaymentSuccessEmail)(user.email, user.name || user.email.split('@')[0], plan.name);
+                // Send payment success email with amount
+                await (0, email_1.sendPaymentSuccessEmail)(user.email, user.name || user.email.split('@')[0], plan.name, amountPaid);
                 break;
             }
             case 'checkout.session.expired': {
@@ -1043,6 +1053,24 @@ app.post('/api/subscription/verify', auth_1.auth, async (req, res) => {
         if (updateResult.modifiedCount === 0) {
             console.error('Failed to update user subscription status');
             return res.status(500).json({ error: 'Failed to update subscription status' });
+        }
+        // Get plan details for email
+        const plan = config_1.SUBSCRIPTION_PLANS.find(p => p.id === planId);
+        if (!plan) {
+            console.error('Plan not found for ID:', planId);
+        }
+        else {
+            // Calculate amount paid
+            const amountPaid = session.amount_total ? session.amount_total / 100 : plan.price;
+            // Send payment success email
+            try {
+                await (0, email_1.sendPaymentSuccessEmail)(user.email, user.name || user.email.split('@')[0], plan.name, amountPaid);
+                console.log('Payment success email sent from verify endpoint');
+            }
+            catch (emailError) {
+                console.error('Error sending payment success email:', emailError);
+                // Don't fail the request if email fails
+            }
         }
         res.json({
             subscriptionStatus: 'active',
