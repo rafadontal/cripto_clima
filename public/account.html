@@ -1,46 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account - YouTube Summary App</title>
+    <title>Minha Conta - ResumoTube</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-gray-800">YouTube Summary App</a>
+                    <a href="/" class="text-2xl font-bold text-indigo-600">ResumoTube</a>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="/" class="text-gray-600 hover:text-gray-900">Home</a>
-                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Logout</button>
+                    <a href="/" class="text-gray-600 hover:text-gray-900 transition-colors">Início</a>
+                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900 transition-colors">Sair</button>
                 </div>
             </div>
         </div>
     </nav>
 
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Account Overview</h2>
+        <div class="bg-white shadow-sm rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Visão Geral da Conta</h2>
             
             <!-- Subscription Status -->
             <div class="mb-8">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Current Plan</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Plano Atual</h3>
                 <div class="bg-gray-50 rounded-lg p-4">
                     <div class="flex justify-between items-center">
                         <div>
-                            <p class="text-sm text-gray-500">Current Tier</p>
-                            <p class="text-xl font-semibold text-gray-900" id="currentTier">Loading...</p>
+                            <p class="text-sm text-gray-500">Plano</p>
+                            <p class="text-xl font-semibold text-gray-900" id="currentTier">Carregando...</p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-500">Status</p>
-                            <p class="text-xl font-semibold" id="subscriptionStatus">Loading...</p>
+                            <p class="text-xl font-semibold" id="subscriptionStatus">Carregando...</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-500">Next Billing Date</p>
-                            <p class="text-xl font-semibold text-gray-900" id="nextBillingDate">Loading...</p>
+                            <p class="text-sm text-gray-500">Próxima Cobrança</p>
+                            <p class="text-xl font-semibold text-gray-900" id="nextBillingDate">Carregando...</p>
                         </div>
                     </div>
                 </div>
@@ -48,29 +57,29 @@
 
             <!-- Usage Statistics -->
             <div class="mb-8">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Usage This Month</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Uso Este Mês</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-gray-50 rounded-lg p-4">
-                        <p class="text-sm text-gray-500">Channels</p>
+                        <p class="text-sm text-gray-500">Canais</p>
                         <div class="mt-2">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-sm font-medium text-gray-700" id="channelsCount">0</span>
                                 <span class="text-sm text-gray-500" id="maxChannels">/ 0</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-indigo-600 h-2 rounded-full" id="channelsProgress" style="width: 0%"></div>
+                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-300" id="channelsProgress" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
                     <div class="bg-gray-50 rounded-lg p-4">
-                        <p class="text-sm text-gray-500">Videos Summarized</p>
+                        <p class="text-sm text-gray-500">Vídeos Resumidos</p>
                         <div class="mt-2">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-sm font-medium text-gray-700" id="videosCount">0</span>
                                 <span class="text-sm text-gray-500" id="maxVideos">/ 0</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-indigo-600 h-2 rounded-full" id="videosProgress" style="width: 0%"></div>
+                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-300" id="videosProgress" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
@@ -79,11 +88,11 @@
 
             <!-- Plan Management -->
             <div>
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Manage Subscription</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Gerenciar Assinatura</h3>
                 <div class="bg-gray-50 rounded-lg p-4">
-                    <p class="text-sm text-gray-500 mb-4">Need more channels or videos? Upgrade your plan to get more features.</p>
-                    <a href="/landing.html" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                        View Plans
+                    <p class="text-sm text-gray-500 mb-4">Precisa de mais canais ou vídeos? Atualize seu plano para obter mais recursos.</p>
+                    <a href="/landing.html" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Ver Planos
                     </a>
                     <div id="subscriptionPlans" class="mt-6"></div>
                 </div>
@@ -110,7 +119,7 @@
                 const response = await fetch('/api/subscription/plans', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!response.ok) throw new Error('Failed to fetch plans');
+                if (!response.ok) throw new Error('Falha ao carregar planos');
                 const plans = await response.json();
                 const container = document.getElementById('subscriptionPlans');
                 if (!container) return;
@@ -118,18 +127,21 @@
                 plans.forEach(plan => {
                     const isCurrent = plan.tier === currentTier;
                     const planDiv = document.createElement('div');
-                    planDiv.className = `mb-4 p-4 rounded-lg border ${isCurrent ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 bg-white'}`;
+                    planDiv.className = `mb-4 p-4 rounded-lg border ${isCurrent ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 bg-white'} transition-colors`;
                     planDiv.innerHTML = `
                         <div class="flex justify-between items-center">
                             <div>
                                 <div class="text-lg font-semibold">${plan.name}</div>
-                                <div class="text-gray-500">€${plan.price}/month</div>
+                                <div class="text-gray-500">R$${plan.price}/mês</div>
                                 <ul class="text-sm text-gray-600 mt-2 list-disc ml-5">
                                     ${plan.features.map(f => `<li>${f}</li>`).join('')}
                                 </ul>
                             </div>
                             <div>
-                                ${isCurrent ? `<span class='px-3 py-1 bg-indigo-600 text-white rounded-full text-xs'>Current</span>` : `<button class='upgradeBtn px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700' data-plan='${plan.id}'>Upgrade</button>`}
+                                ${isCurrent ? 
+                                    `<span class='px-3 py-1 bg-indigo-600 text-white rounded-full text-xs'>Atual</span>` : 
+                                    `<button class='upgradeBtn px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors' data-plan='${plan.id}'>Atualizar</button>`
+                                }
                             </div>
                         </div>
                     `;
@@ -152,15 +164,15 @@
                             if (resp.ok && data.sessionId) {
                                 window.location.href = `https://checkout.stripe.com/pay/${data.sessionId}`;
                             } else {
-                                alert(data.error || 'Failed to start checkout');
+                                alert(data.error || 'Falha ao iniciar checkout');
                             }
                         } catch (err) {
-                            alert('Error starting checkout: ' + err.message);
+                            alert('Erro ao iniciar checkout: ' + err.message);
                         }
                     });
                 });
             } catch (err) {
-                console.error('Error loading plans:', err);
+                console.error('Erro ao carregar planos:', err);
             }
         }
 
@@ -175,7 +187,7 @@
 
                 if (!response.ok) {
                     const errData = await response.json();
-                    throw new Error(errData.error || 'Failed to fetch account information');
+                    throw new Error(errData.error || 'Falha ao carregar informações da conta');
                 }
 
                 const data = await response.json();
@@ -213,8 +225,8 @@
                 }
                 loadSubscriptionPlans(data.tier);
             } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while loading account information: ' + (error.message || error));
+                console.error('Erro:', error);
+                alert('Ocorreu um erro ao carregar as informações da conta: ' + (error.message || error));
             }
         }
 

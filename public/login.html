@@ -3,22 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - YouTube Summary App</title>
+    <title>Login - ResumoTube</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
         <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">YouTube Summary App</h1>
-            <p class="mt-2 text-gray-600">Gerencie seus canais favoritos do YouTube</p>
+            <h1 class="text-2xl font-bold text-indigo-600">ResumoTube</h1>
+            <p class="mt-2 text-gray-600">Resumos Inteligentes do YouTube</p>
         </div>
 
         <!-- Tabs -->
         <div class="flex border-b border-gray-200 mb-8">
-            <button id="loginTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none">
+            <button id="loginTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none transition-colors">
                 Já tenho uma conta
             </button>
-            <button id="registerTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none">
+            <button id="registerTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none transition-colors">
                 Criar nova conta
             </button>
         </div>
@@ -27,18 +36,18 @@
         <form id="loginForm" class="space-y-6">
             <div>
                 <label for="loginEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="loginEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="email" id="loginEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
             <div>
                 <label for="loginPassword" class="block text-sm font-medium text-gray-700">Senha</label>
-                <input type="password" id="loginPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="password" id="loginPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
             <div class="mt-4 text-center">
-                <a href="#" id="forgotPasswordLink" class="text-sm text-indigo-600 hover:text-indigo-500">
+                <a href="#" id="forgotPasswordLink" class="text-sm text-indigo-600 hover:text-indigo-500 transition-colors">
                     Esqueceu sua senha?
                 </a>
             </div>
-            <button type="submit" id="loginButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <button type="submit" id="loginButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                 <span class="button-text">Entrar</span>
                 <div class="loading-spinner hidden">
                     <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -60,7 +69,7 @@
 
             <!-- Google Sign In Button -->
             <button type="button" id="googleSignIn" 
-                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -75,17 +84,17 @@
         <form id="registerForm" class="space-y-6 hidden">
             <div>
                 <label for="registerEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="registerEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="email" id="registerEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
             <div>
                 <label for="registerPassword" class="block text-sm font-medium text-gray-700">Senha</label>
-                <input type="password" id="registerPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="password" id="registerPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
             <div>
                 <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirmar Senha</label>
-                <input type="password" id="confirmPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="password" id="confirmPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
-            <button type="submit" id="registerButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <button type="submit" id="registerButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                 <span class="button-text">Criar Conta</span>
                 <div class="loading-spinner hidden">
                     <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -107,7 +116,7 @@
 
             <!-- Google Sign In Button -->
             <button type="button" id="googleSignUp" 
-                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -123,16 +132,16 @@
             <div>
                 <label for="resetEmail" class="block text-sm font-medium text-gray-700">Email</label>
                 <input type="email" id="resetEmail" name="resetEmail" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 transition-colors">
             </div>
             <div>
                 <button type="submit"
-                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                     Enviar Link de Redefinição
                 </button>
             </div>
             <div class="text-center">
-                <a href="#" id="backToLoginLink" class="text-sm text-indigo-600 hover:text-indigo-500">
+                <a href="#" id="backToLoginLink" class="text-sm text-indigo-600 hover:text-indigo-500 transition-colors">
                     Voltar para o Login
                 </a>
             </div>
