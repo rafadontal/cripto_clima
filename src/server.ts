@@ -1149,8 +1149,8 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
           throw new Error(`User not found: ${userId}`);
         }
 
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as Stripe.Subscription;
-        const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+        const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
         
         await usersCollection.updateOne(
           { _id: new ObjectId(userId) },
@@ -1175,7 +1175,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as any;
         const user = await usersCollection.findOne({ subscriptionId: subscription.id });
 
         logInfo('Processing subscription deletion', {
@@ -1184,8 +1184,6 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
         });
 
         if (user) {
-          const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
-          
           await usersCollection.updateOne(
             { _id: user._id },
             {
@@ -1201,14 +1199,14 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
             email: user.email
           });
 
-          await sendSubscriptionCancelledEmail(user.email, user.name || user.email.split('@')[0], currentPeriodEnd);
+          await sendSubscriptionCancelledEmail(user.email, user.name || user.email.split('@')[0], new Date(subscription.current_period_end * 1000));
         }
         break;
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const invoice = event.data.object as any;
+        const subscriptionId = invoice.subscription;
         const user = await usersCollection.findOne({ subscriptionId });
 
         logInfo('Processing failed payment', {
