@@ -1,3 +1,6 @@
+// Add dynamic export at the top of the file
+export const dynamic = 'force-dynamic';
+
 import dotenv from 'dotenv';
 
 // Load environment variables with override
@@ -1122,18 +1125,19 @@ app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
     }
 });
 
-// Stripe webhook handler
+// Update webhook handler to ensure proper body parsing
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+  // Log raw request details first
+  console.log('Raw webhook request received');
+  console.log('Headers:', JSON.stringify(req.headers));
+  console.log('Body type:', typeof req.body);
+  console.log('Body length:', req.body?.length);
+
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   // Immediate console log for webhook receipt
   console.log('Webhook received:', {
-    signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
-    type: req.headers['stripe-event-type']
-  });
-
-  logInfo('Received webhook', { 
     signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
     type: req.headers['stripe-event-type']
   });
@@ -1146,13 +1150,21 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: 
 
   let event;
   try {
+    // Log the raw body before processing
+    console.log('Processing webhook body...');
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     console.log('Webhook event constructed successfully:', event.type);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook signature verification failed:', error);
+    // Log the error details
+    console.error('Error details:', {
+      message: error?.message || 'Unknown error',
+      stack: error?.stack || 'No stack trace',
+      body: req.body ? 'Body present' : 'No body'
+    });
     logError(error, 'Stripe webhook signature verification', {
       signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
-      body: JSON.stringify(req.body).substring(0, 100) + '...'
+      body: req.body ? 'Body present' : 'No body'
     });
     return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
