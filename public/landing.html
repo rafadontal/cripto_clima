@@ -134,7 +134,7 @@
             if (!token) return;
 
             try {
-                const response = await fetch('/api/account/usage', {
+                const response = await fetch('/api/subscription/status', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -148,6 +148,8 @@
                 }
             } catch (error) {
                 console.error('Error checking auth:', error);
+                // Clear invalid token
+                localStorage.removeItem('token');
             }
         }
 
@@ -180,9 +182,12 @@
                                 <span class="text-4xl font-extrabold text-gray-900">R$${plan.price}</span>
                                 <span class="text-base font-medium text-gray-500">/mês</span>
                             </p>
-                            <a href="/login.html?plan=${plan.id}" class="mt-8 block w-full bg-indigo-600 text-white text-center py-2 px-4 rounded-md hover:bg-indigo-700">
+                            <button 
+                                class="mt-8 block w-full bg-indigo-600 text-white text-center py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+                                data-plan-id="${plan.id}"
+                            >
                                 Começar Agora
-                            </a>
+                            </button>
                         </div>
                         <div class="pt-6 pb-8 px-6">
                             <h4 class="text-sm font-medium text-gray-900 tracking-wide">O que está incluído</h4>
@@ -202,53 +207,33 @@
                 });
 
                 // Add click handlers for plan selection
-                document.querySelectorAll('a[href^="/login.html"]').forEach(link => {
-                    link.addEventListener('click', async (e) => {
-                        e.preventDefault();
-                        const planId = e.target.closest('.bg-white').querySelector('a').href.split('plan=')[1];
-                        
-                        // Check if we have registration data
-                        const registrationData = localStorage.getItem('registrationData');
-                        const isFromRegistration = localStorage.getItem('isFromRegistration') === 'true';
+                document.querySelectorAll('button[data-plan-id]').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const planId = e.target.dataset.planId;
                         const token = localStorage.getItem('token');
 
-                        if (isFromRegistration && registrationData) {
-                            // If coming from registration, create account first
+                        if (token) {
+                            // If already logged in, proceed with checkout
                             try {
-                                const { email, password } = JSON.parse(registrationData);
-                                const registerResponse = await fetch('/api/register', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({ email, password })
-                                });
-
-                                if (!registerResponse.ok) {
-                                    throw new Error('Failed to create account');
-                                }
-
-                                const { token } = await registerResponse.json();
-                                localStorage.setItem('token', token);
-                                
-                                // Proceed with checkout
+                                e.target.disabled = true;
+                                e.target.textContent = 'Processando...';
                                 await createCheckoutSession(planId, token);
                             } catch (error) {
                                 console.error('Error:', error);
-                                alert('Erro ao criar conta. Por favor, tente novamente.');
+                                e.target.disabled = false;
+                                e.target.textContent = 'Começar Agora';
+                                alert('Erro ao processar seleção do plano. Por favor, tente novamente.');
                             }
-                        } else if (token) {
-                            // If already logged in, proceed with checkout
-                            await createCheckoutSession(planId, token);
                         } else {
-                            // If not logged in, store plan and redirect to login
+                            // If not logged in, store plan and redirect to register
                             localStorage.setItem('selectedPlan', planId);
-                            window.location.href = '/login.html';
+                            window.location.href = '/register.html';
                         }
                     });
                 });
             } catch (error) {
                 console.error('Error loading plans:', error);
+                alert('Erro ao carregar planos. Por favor, recarregue a página.');
             }
         }
 
@@ -272,24 +257,14 @@
                 window.location.href = url;
             } catch (error) {
                 console.error('Error:', error);
-                alert('Erro ao processar seleção do plano. Por favor, tente novamente.');
+                throw error;
             }
         }
 
         // Load plans when page loads
         loadPlans();
 
-        // Get plan from URL if present
-        const urlParams = new URLSearchParams(window.location.search);
-        const plan = urlParams.get('plan');
-        if (plan) {
-            // Store the selected plan
-            localStorage.setItem('selectedPlan', plan);
-            // Redirect to login
-            window.location.href = '/login.html';
-        }
-
-        // Clear registration data when leaving the page
+        // Clear any stale data when leaving the page
         window.addEventListener('beforeunload', () => {
             localStorage.removeItem('registrationData');
             localStorage.removeItem('isFromRegistration');

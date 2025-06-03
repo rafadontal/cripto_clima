@@ -25,7 +25,7 @@ import { AuthRequest, User, Channel, Video, UserChannel, UserVideoSummary } from
 import { SUBSCRIPTION_PLANS, STRIPE_CONFIG } from './config';
 import Stripe from 'stripe';
 import { getStripeConfig } from './config';
-import { sendWelcomeEmail, sendPaymentSuccessEmail, sendPaymentFailedEmail, sendPasswordResetEmail } from './services/email';
+import { sendWelcomeEmail, sendPaymentSuccessEmail, sendPaymentFailedEmail, sendPasswordResetEmail, sendSubscriptionCancelledEmail } from './services/email';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -222,8 +222,9 @@ app.post('/api/login', async (req: Request, res: Response) => {
     const token = jwt.sign({ userId: user._id.toString(), email }, JWT_SECRET);
     
     // Check subscription status
-    if (user.subscriptionStatus === 'active') {
-      // User has active subscription, return token and redirect to app
+    if (user.subscriptionStatus === 'active' || 
+        (user.subscriptionStatus === 'cancelled' && user.currentPeriodEnd && new Date(user.currentPeriodEnd) > new Date())) {
+      // User has active subscription or cancelled but still within period, return token and redirect to app
       return res.json({ 
         token,
         subscriptionStatus: 'active',
@@ -1294,11 +1295,17 @@ app.get('/api/subscription/status', auth, async (req: AuthRequest, res: Response
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Check if subscription is cancelled but still within period
+        const isWithinCancelledPeriod = user.subscriptionStatus === 'cancelled' && 
+            user.currentPeriodEnd && 
+            new Date(user.currentPeriodEnd) > new Date();
+
         res.json({
-            subscriptionStatus: user.subscriptionStatus,
+            subscriptionStatus: isWithinCancelledPeriod ? 'active' : user.subscriptionStatus,
             tier: user.tier,
             currentPeriodEnd: user.currentPeriodEnd,
-            subscriptionStartDate: user.subscriptionStartDate
+            subscriptionStartDate: user.subscriptionStartDate,
+            isCancelled: user.subscriptionStatus === 'cancelled'
         });
     } catch (error) {
         console.error('Error checking subscription status:', error);
@@ -1438,6 +1445,56 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error resetting password:', error);
         res.status(500).json({ error: 'Erro ao redefinir senha' });
+    }
+});
+
+// Add subscription cancellation endpoint
+app.post('/api/subscription/cancel', auth, async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user?.userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (!user.stripeSubscriptionId) {
+            return res.status(400).json({ error: 'No active subscription found' });
+        }
+
+        // Cancel the subscription in Stripe
+        await stripe.subscriptions.update(user.stripeSubscriptionId, {
+            cancel_at_period_end: true
+        });
+
+        // Update user's subscription status
+        await usersCollection.updateOne(
+            { _id: new ObjectId(user._id) },
+            { 
+                $set: { 
+                    subscriptionStatus: 'cancelled',
+                    subscriptionCancelledAt: new Date()
+                }
+            }
+        );
+
+        // Send cancellation confirmation email
+        try {
+            await sendSubscriptionCancelledEmail(
+                user.email,
+                user.name || user.email.split('@')[0],
+                user.currentPeriodEnd
+            );
+        } catch (emailError) {
+            console.error('Error sending cancellation email:', emailError);
+            // Don't fail the request if email fails
+        }
+
+        res.json({ 
+            message: 'Subscription cancelled successfully',
+            currentPeriodEnd: user.currentPeriodEnd
+        });
+    } catch (error) {
+        console.error('Error cancelling subscription:', error);
+        res.status(500).json({ error: 'Failed to cancel subscription' });
     }
 });
 

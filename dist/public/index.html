@@ -1,157 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Summary App</title>
+    <title>ResumoTube - Resumos Inteligentes do YouTube</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-800">YouTube Summary App</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/account.html" class="text-gray-600 hover:text-gray-900">Account</a>
-                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Logout</button>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Add Channel Modal -->
-    <div id="addChannelModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Channel</h3>
-                <div class="mt-2 px-7 py-3">
-                    <input type="text" id="channelUrl" placeholder="Enter YouTube channel URL" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div class="flex justify-end space-x-4 mt-4">
-                    <button id="cancelAddChannel" class="px-4 py-2 text-gray-500 hover:text-gray-700">Cancel</button>
-                    <button id="confirmAddChannel" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                        Add Channel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="flex h-[calc(100vh-8rem)]">
-            <!-- Left Panel - Channel List -->
-            <div class="w-1/4 bg-white shadow rounded-lg p-4 mr-4 overflow-y-auto">
-                <div class="space-y-4">
-                    <button id="addChannelButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Add Channel
-                    </button>
-
-                    <button id="summarizeVideoButton" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                        Summarize Video
-                    </button>
-
-                    <button id="searchButton" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                        Search Summaries
-                    </button>
-
-                    <div class="border-t border-gray-200 pt-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-medium text-gray-900">Your Channels</h2>
-                            <button id="viewAllChannels" class="text-sm text-indigo-600 hover:text-indigo-900">View All</button>
-                        </div>
-                        <div id="channelsList" class="space-y-2">
-                            <!-- Channels will be added here dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="border-t border-gray-200 pt-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-medium text-gray-900">Summary History</h2>
-                            <button id="viewAllSummaries" class="text-sm text-indigo-600 hover:text-indigo-900">View All</button>
-                        </div>
-                        <div id="summaryHistory" class="space-y-2">
-                            <!-- Summary history will be added here dynamically -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel - Video Summaries -->
-            <div class="w-3/4 bg-white shadow rounded-lg p-4 overflow-y-auto">
-                <div id="videoContent" class="space-y-6">
-                    <!-- Video Input Section -->
-                    <div id="videoInputSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
-                        <h3 class="text-xl font-medium text-gray-900 mb-4">Summarize Video</h3>
-                        <div class="flex space-x-4">
-                            <input type="text" id="videoUrl" placeholder="Enter YouTube video URL" 
-                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <button id="submitVideoButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center">
-                                <span id="submitButtonText">Summarize</span>
-                                <svg id="loadingSpinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Search Section -->
-                    <div id="searchSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
-                        <h3 class="text-xl font-medium text-gray-900 mb-4">Search Summaries</h3>
-                        <div class="flex space-x-4">
-                            <input type="text" id="searchInput" placeholder="Search in summaries..." 
-                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <select id="searchType" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="all">All Summaries</option>
-                                <option value="history">History Only</option>
-                                <option value="channels">Channels Only</option>
-                            </select>
-                            <button id="searchSubmitButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                                Search
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Results Section -->
-                    <div id="searchResults" class="space-y-4">
-                        <!-- Results will be added here dynamically -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add a new modal for viewing all summaries -->
-    <div id="allSummariesModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-        <div class="relative top-20 mx-auto p-5 border w-3/4 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-medium text-gray-900">All Summaries</h3>
-                <button id="closeAllSummaries" class="text-gray-500 hover:text-gray-700">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <div id="allSummariesList" class="space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
-                <!-- All summaries will be added here dynamically -->
-            </div>
-        </div>
-    </div>
-
     <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        }
+        .feature-card {
+            transition: transform 0.2s;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
         .markdown-content h1 {
             font-size: 1.5em;
             font-weight: bold;
@@ -202,6 +70,150 @@
             color: #4b5563;
         }
     </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-indigo-600">ResumoTube</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/account.html" class="text-gray-600 hover:text-gray-900">Minha Conta</a>
+                    <button id="logoutButton" class="text-gray-600 hover:text-gray-900">Sair</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Add Channel Modal -->
+    <div id="addChannelModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Adicionar Novo Canal</h3>
+                <div class="mt-2 px-7 py-3">
+                    <input type="text" id="channelUrl" placeholder="Digite a URL do canal do YouTube" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex justify-end space-x-4 mt-4">
+                    <button id="cancelAddChannel" class="px-4 py-2 text-gray-500 hover:text-gray-700">Cancelar</button>
+                    <button id="confirmAddChannel" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                        Adicionar Canal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="flex h-[calc(100vh-8rem)]">
+            <!-- Left Panel - Channel List -->
+            <div class="w-1/4 bg-white shadow rounded-lg p-4 mr-4 overflow-y-auto">
+                <div class="space-y-4">
+                    <button id="addChannelButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Adicionar Canal
+                    </button>
+
+                    <button id="summarizeVideoButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        Resumir Vídeo
+                    </button>
+
+                    <button id="searchButton" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Buscar Resumos
+                    </button>
+
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-medium text-gray-900">Seus Canais</h2>
+                            <button id="viewAllChannels" class="text-sm text-indigo-600 hover:text-indigo-900">Ver Todos</button>
+                        </div>
+                        <div id="channelsList" class="space-y-2">
+                            <!-- Channels will be added here dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-medium text-gray-900">Histórico de Resumos</h2>
+                            <button id="viewAllSummaries" class="text-sm text-indigo-600 hover:text-indigo-900">Ver Todos</button>
+                        </div>
+                        <div id="summaryHistory" class="space-y-2">
+                            <!-- Summary history will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Video Summaries -->
+            <div class="w-3/4 bg-white shadow rounded-lg p-4 overflow-y-auto">
+                <div id="videoContent" class="space-y-6">
+                    <!-- Video Input Section -->
+                    <div id="videoInputSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
+                        <h3 class="text-xl font-medium text-gray-900 mb-4">Resumir Vídeo</h3>
+                        <div class="flex space-x-4">
+                            <input type="text" id="videoUrl" placeholder="Digite a URL do vídeo do YouTube" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button id="submitVideoButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center">
+                                <span id="submitButtonText">Resumir</span>
+                                <svg id="loadingSpinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Section -->
+                    <div id="searchSection" class="bg-gray-50 rounded-lg p-6 mb-6 hidden">
+                        <h3 class="text-xl font-medium text-gray-900 mb-4">Buscar Resumos</h3>
+                        <div class="flex space-x-4">
+                            <input type="text" id="searchInput" placeholder="Buscar nos resumos..." 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <select id="searchType" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">Todos os Resumos</option>
+                                <option value="history">Apenas Histórico</option>
+                                <option value="channels">Apenas Canais</option>
+                            </select>
+                            <button id="searchSubmitButton" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                                Buscar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="searchResults" class="space-y-4">
+                        <!-- Results will be added here dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add a new modal for viewing all summaries -->
+    <div id="allSummariesModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-3/4 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-medium text-gray-900">Todos os Resumos</h3>
+                <button id="closeAllSummaries" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="allSummariesList" class="space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
+                <!-- All summaries will be added here dynamically -->
+            </div>
+        </div>
+    </div>
 
     <script>
         // Check authentication
@@ -367,7 +379,7 @@
             } finally {
                 // Re-enable button and hide loading state
                 submitButton.disabled = false;
-                submitButtonText.textContent = 'Summarize';
+                submitButtonText.textContent = 'Resumir';
                 loadingSpinner.classList.add('hidden');
             }
         });

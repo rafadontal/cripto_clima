@@ -4,6 +4,7 @@ exports.sendWelcomeEmail = sendWelcomeEmail;
 exports.sendPaymentSuccessEmail = sendPaymentSuccessEmail;
 exports.sendPaymentFailedEmail = sendPaymentFailedEmail;
 exports.sendPasswordResetEmail = sendPasswordResetEmail;
+exports.sendSubscriptionCancelledEmail = sendSubscriptionCancelledEmail;
 const resend_1 = require("resend");
 let resend = null;
 function getResend() {
@@ -156,6 +157,44 @@ async function sendPasswordResetEmail(email, resetToken) {
             stack: error instanceof Error ? error.stack : undefined,
             email,
             resetToken: resetToken.substring(0, 10) + '...' // Log only part of the token for security
+        });
+        throw error;
+    }
+}
+async function sendSubscriptionCancelledEmail(email, name, endDate) {
+    console.log(`Attempting to send subscription cancelled email to ${email}...`);
+    try {
+        const formattedDate = endDate.toLocaleDateString('pt-BR');
+        const response = await getResend().emails.send({
+            from: 'ResumoTube <noreply@resumotube.com.br>',
+            to: email,
+            subject: 'Sua assinatura foi cancelada',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #4F46E5;">Sua assinatura foi cancelada</h2>
+                    <p>Olá ${name},</p>
+                    <p>Confirmamos o cancelamento da sua assinatura do ResumoTube.</p>
+                    <p>Importante: Você ainda tem acesso a todos os recursos premium até <strong>${formattedDate}</strong>.</p>
+                    <p>Após essa data, sua conta será convertida para o plano gratuito, que inclui:</p>
+                    <ul>
+                        <li>Até 3 canais</li>
+                        <li>Até 10 resumos por mês</li>
+                    </ul>
+                    <p>Se mudar de ideia, você pode reativar sua assinatura a qualquer momento através da sua conta.</p>
+                    <p>Atenciosamente,<br>Equipe ResumoTube</p>
+                </div>
+            `
+        });
+        console.log('Subscription cancelled email sent successfully:', response);
+        return response;
+    }
+    catch (error) {
+        console.error('Error sending subscription cancelled email:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            email,
+            name,
+            endDate
         });
         throw error;
     }

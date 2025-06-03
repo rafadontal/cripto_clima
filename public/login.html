@@ -15,229 +15,110 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-indigo-600">ResumoTube</h1>
-            <p class="mt-2 text-gray-600">Resumos Inteligentes do YouTube</p>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/landing.html" class="text-2xl font-bold text-indigo-600">ResumoTube</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/register.html" class="text-gray-600 hover:text-gray-900">Não tem uma conta? Registre-se</a>
+                </div>
+            </div>
         </div>
+    </nav>
 
-        <!-- Tabs -->
-        <div class="flex border-b border-gray-200 mb-8">
-            <button id="loginTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none transition-colors">
-                Já tenho uma conta
-            </button>
-            <button id="registerTab" class="flex-1 py-2 px-4 text-center text-gray-600 hover:text-indigo-600 focus:outline-none transition-colors">
-                Criar nova conta
-            </button>
-        </div>
+    <div class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Entre na sua conta
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600">
+                    E continue recebendo resumos inteligentes do YouTube
+                </p>
+            </div>
+            <form id="loginForm" class="mt-8 space-y-6">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="email" class="sr-only">Email</label>
+                        <input id="email" name="email" type="email" required 
+                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                            placeholder="Email">
+                    </div>
+                    <div>
+                        <label for="password" class="sr-only">Senha</label>
+                        <input id="password" name="password" type="password" required 
+                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                            placeholder="Senha">
+                    </div>
+                </div>
 
-        <!-- Login Form -->
-        <form id="loginForm" class="space-y-6">
-            <div>
-                <label for="loginEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="loginEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-            </div>
-            <div>
-                <label for="loginPassword" class="block text-sm font-medium text-gray-700">Senha</label>
-                <input type="password" id="loginPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-            </div>
-            <div class="mt-4 text-center">
-                <a href="#" id="forgotPasswordLink" class="text-sm text-indigo-600 hover:text-indigo-500 transition-colors">
-                    Esqueceu sua senha?
-                </a>
-            </div>
-            <button type="submit" id="loginButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                <span class="button-text">Entrar</span>
-                <div class="loading-spinner hidden">
-                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <div class="flex items-center justify-between">
+                    <div class="text-sm">
+                        <a href="/reset-password.html" class="font-medium text-indigo-600 hover:text-indigo-500">
+                            Esqueceu sua senha?
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" 
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <svg class="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
+                        Entrar
+                    </button>
+                </div>
+
+                <!-- Divider -->
+                <div class="relative my-6">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-gray-50 text-gray-500">ou continue com</span>
+                    </div>
+                </div>
+
+                <!-- Google Sign In Button -->
+                <button type="button" id="googleSignIn" 
+                        class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                </div>
-            </button>
-
-            <!-- Divider -->
-            <div class="relative my-6">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-gray-300"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                    <span class="px-2 bg-white text-gray-500">ou continue com</span>
-                </div>
-            </div>
-
-            <!-- Google Sign In Button -->
-            <button type="button" id="googleSignIn" 
-                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Entrar com Google
-            </button>
-        </form>
-
-        <!-- Register Form -->
-        <form id="registerForm" class="space-y-6 hidden">
-            <div>
-                <label for="registerEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="registerEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-            </div>
-            <div>
-                <label for="registerPassword" class="block text-sm font-medium text-gray-700">Senha</label>
-                <input type="password" id="registerPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-            </div>
-            <div>
-                <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirmar Senha</label>
-                <input type="password" id="confirmPassword" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-            </div>
-            <button type="submit" id="registerButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                <span class="button-text">Criar Conta</span>
-                <div class="loading-spinner hidden">
-                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </div>
-            </button>
-
-            <!-- Divider -->
-            <div class="relative my-6">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-gray-300"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                    <span class="px-2 bg-white text-gray-500">ou continue com</span>
-                </div>
-            </div>
-
-            <!-- Google Sign In Button -->
-            <button type="button" id="googleSignUp" 
-                    class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Criar conta com Google
-            </button>
-        </form>
-
-        <!-- Forgot Password Form -->
-        <form id="forgotPasswordForm" class="mt-8 space-y-6 hidden">
-            <div>
-                <label for="resetEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="resetEmail" name="resetEmail" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 transition-colors">
-            </div>
-            <div>
-                <button type="submit"
-                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                    Enviar Link de Redefinição
+                    Entrar com Google
                 </button>
-            </div>
-            <div class="text-center">
-                <a href="#" id="backToLoginLink" class="text-sm text-indigo-600 hover:text-indigo-500 transition-colors">
-                    Voltar para o Login
-                </a>
-            </div>
-        </form>
-
-        <div id="error" class="hidden mt-4 text-red-600 text-center"></div>
-        <div id="success" class="hidden mt-4 text-green-600 text-center"></div>
+            </form>
+        </div>
     </div>
 
     <script>
-        // Check if user is already logged in
-        async function checkAuth() {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-
-            try {
-                const response = await fetch('/api/account/usage', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.subscriptionStatus === 'active') {
-                        // Prevent any other redirects by using replace instead of href
-                        window.location.replace('/index.html');
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking auth:', error);
-                // Clear invalid token
-                localStorage.removeItem('token');
-            }
-        }
-
-        // Check if coming from plan selection
-        const urlParams = new URLSearchParams(window.location.search);
-        const selectedPlan = localStorage.getItem('selectedPlan');
-        const showRegister = false; // Always show login form by default
-
-        // Tab switching
-        const loginTab = document.getElementById('loginTab');
-        const registerTab = document.getElementById('registerTab');
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-
-        function switchToLogin() {
-            loginTab.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
-            registerTab.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
-            loginForm.classList.remove('hidden');
-            registerForm.classList.add('hidden');
-        }
-
-        function switchToRegister() {
-            registerTab.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
-            loginTab.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
-            registerForm.classList.remove('hidden');
-            loginForm.classList.add('hidden');
-        }
-
-        loginTab.addEventListener('click', switchToLogin);
-        registerTab.addEventListener('click', switchToRegister);
-
-        // Show register form by default if coming from plan selection
-        if (showRegister) {
-            switchToRegister();
-        } else {
-            switchToLogin();
-        }
-
-        // Helper function to show/hide loading state
-        function setLoading(buttonId, isLoading) {
-            const button = document.getElementById(buttonId);
-            const buttonText = button.querySelector('.button-text');
-            const spinner = button.querySelector('.loading-spinner');
-            
-            if (isLoading) {
-                button.disabled = true;
-                buttonText.classList.add('hidden');
-                spinner.classList.remove('hidden');
-            } else {
-                button.disabled = false;
-                buttonText.classList.remove('hidden');
-                spinner.classList.add('hidden');
-            }
-        }
-
-        // Login form submission
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            setLoading('loginButton', true);
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const submitButton = e.target.querySelector('button[type="submit"]');
 
             try {
+                // Disable button and show loading state
+                submitButton.disabled = true;
+                submitButton.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Entrando...
+                `;
+
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {
@@ -246,219 +127,112 @@
                     body: JSON.stringify({ email, password })
                 });
 
-                const data = await response.json();
-                if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('userEmail', email);
-                    localStorage.setItem('userPassword', password);
-                    
-                    // Check subscription status
-                    if (data.subscriptionStatus === 'active') {
-                        window.location.replace('/index.html');
-                    } else {
-                        // Show a message about needing a plan
-                        const successDiv = document.getElementById('success');
-                        successDiv.textContent = 'Você precisa selecionar um plano para continuar.';
-                        successDiv.classList.remove('hidden');
-                        
-                        // Redirect to plans page after a short delay
-                        setTimeout(() => {
-                            window.location.replace('/landing.html');
-                        }, 2000);
-                    }
-                } else {
-                    setLoading('loginButton', false);
-                    showError(data.error || 'Erro ao fazer login');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Erro ao fazer login');
                 }
-            } catch (error) {
-                setLoading('loginButton', false);
-                showError('Erro ao fazer login. Tente novamente.');
-            }
-        });
 
-        // Register form submission
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            setLoading('registerButton', true);
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
+                const { token } = await response.json();
+                localStorage.setItem('token', token);
 
-            if (password !== confirmPassword) {
-                setLoading('registerButton', false);
-                showError('As senhas não coincidem');
-                return;
-            }
+                // Check if we have a selected plan
+                const selectedPlan = localStorage.getItem('selectedPlan');
+                if (selectedPlan) {
+                    // If we have a selected plan, proceed to checkout
+                    try {
+                        const checkoutResponse = await fetch('/api/subscription/create-checkout', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ planId: selectedPlan })
+                        });
 
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('userEmail', email);
-                    localStorage.setItem('userPassword', password);
-
-                    // If coming from plan selection, proceed to checkout
-                    if (selectedPlan) {
-                        try {
-                            const checkoutResponse = await fetch('/api/subscription/create-checkout', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${data.token}`
-                                },
-                                body: JSON.stringify({ planId: selectedPlan })
-                            });
-
-                            if (checkoutResponse.ok) {
-                                const checkoutData = await checkoutResponse.json();
-                                if (checkoutData.url) {
-                                    window.location.href = checkoutData.url;
-                                    return;
-                                }
-                            }
-                            // If checkout fails, redirect to landing page
-                            window.location.replace('/landing.html');
-                        } catch (error) {
-                            console.error('Checkout error:', error);
-                            window.location.replace('/landing.html');
+                        if (!checkoutResponse.ok) {
+                            throw new Error('Erro ao criar sessão de checkout');
                         }
-                    } else {
-                        // Store registration data for plan selection
-                        localStorage.setItem('isFromRegistration', 'true');
-                        localStorage.setItem('registrationData', JSON.stringify({ email, password }));
-                        window.location.replace('/landing.html');
+
+                        const { url } = await checkoutResponse.json();
+                        window.location.href = url;
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Erro ao processar seleção do plano. Por favor, tente novamente.');
+                        window.location.href = '/landing.html';
                     }
                 } else {
-                    setLoading('registerButton', false);
-                    showError(data.error || 'Erro ao criar conta');
+                    // If no plan selected, check subscription status
+                    try {
+                        const statusResponse = await fetch('/api/subscription/status', {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        if (!statusResponse.ok) {
+                            throw new Error('Erro ao verificar status da assinatura');
+                        }
+
+                        const { subscriptionStatus } = await statusResponse.json();
+                        if (subscriptionStatus === 'active') {
+                            window.location.href = '/index.html';
+                        } else {
+                            window.location.href = '/landing.html';
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        window.location.href = '/landing.html';
+                    }
                 }
             } catch (error) {
-                setLoading('registerButton', false);
-                showError('Erro ao criar conta. Tente novamente.');
+                console.error('Error:', error);
+                alert(error.message || 'Erro ao fazer login. Por favor, tente novamente.');
+                
+                // Reset button state
+                submitButton.disabled = false;
+                submitButton.innerHTML = `
+                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <svg class="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    Entrar
+                `;
             }
         });
 
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-        }
-
-        // Check auth status when page loads
-        checkAuth();
-
-        // Add loading state to Google buttons
+        // Add Google Sign In handler
         document.getElementById('googleSignIn').addEventListener('click', async () => {
             const button = document.getElementById('googleSignIn');
             button.disabled = true;
             button.classList.add('opacity-50');
+
             try {
                 const response = await fetch('/api/auth/google/url');
                 const data = await response.json();
+                
                 if (data.url) {
                     // Store the selected plan before redirecting
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const plan = urlParams.get('plan');
-                    if (plan) {
-                        localStorage.setItem('selectedPlan', plan);
+                    const selectedPlan = localStorage.getItem('selectedPlan');
+                    if (selectedPlan) {
+                        localStorage.setItem('pendingGoogleAuth', 'true');
                     }
                     window.location.href = data.url;
+                } else {
+                    throw new Error('Erro ao iniciar autenticação com Google');
                 }
-            } catch (error) {
-                button.disabled = false;
-                button.classList.remove('opacity-50');
-                showError('Erro ao iniciar autenticação com Google');
-            }
-        });
-
-        document.getElementById('googleSignUp').addEventListener('click', async () => {
-            const button = document.getElementById('googleSignUp');
-            button.disabled = true;
-            button.classList.add('opacity-50');
-            try {
-                const response = await fetch('/api/auth/google/url');
-                const data = await response.json();
-                if (data.url) {
-                    // Store the selected plan before redirecting
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const plan = urlParams.get('plan');
-                    if (plan) {
-                        localStorage.setItem('selectedPlan', plan);
-                    }
-                    window.location.href = data.url;
-                }
-            } catch (error) {
-                button.disabled = false;
-                button.classList.remove('opacity-50');
-                showError('Erro ao iniciar autenticação com Google');
-            }
-        });
-
-        // Forgot Password Form Handling
-        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
-        const backToLoginLink = document.getElementById('backToLoginLink');
-        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-        const errorDiv = document.getElementById('error');
-        const successDiv = document.getElementById('success');
-
-        forgotPasswordLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            loginForm.classList.add('hidden');
-            forgotPasswordForm.classList.remove('hidden');
-            errorDiv.classList.add('hidden');
-            successDiv.classList.add('hidden');
-        });
-
-        backToLoginLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            forgotPasswordForm.classList.add('hidden');
-            loginForm.classList.remove('hidden');
-            errorDiv.classList.add('hidden');
-            successDiv.classList.add('hidden');
-        });
-
-        forgotPasswordForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('resetEmail').value;
-            
-            try {
-                const response = await fetch('/api/auth/forgot-password', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email })
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erro ao enviar email de redefinição');
-                }
-                
-                // Show success message
-                errorDiv.classList.add('hidden');
-                successDiv.textContent = 'Email de redefinição enviado! Verifique sua caixa de entrada.';
-                successDiv.classList.remove('hidden');
-                
-                // Clear form
-                document.getElementById('resetEmail').value = '';
-                
             } catch (error) {
                 console.error('Error:', error);
-                successDiv.classList.add('hidden');
-                errorDiv.textContent = error.message;
-                errorDiv.classList.remove('hidden');
+                alert('Erro ao iniciar autenticação com Google. Por favor, tente novamente.');
+                button.disabled = false;
+                button.classList.remove('opacity-50');
             }
+        });
+
+        // Clear any stale data when leaving the page
+        window.addEventListener('beforeunload', () => {
+            localStorage.removeItem('registrationData');
+            localStorage.removeItem('isFromRegistration');
         });
     </script>
 </body>
