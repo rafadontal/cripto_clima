@@ -32,39 +32,60 @@ const config_2 = require("./config");
 const email_1 = require("./services/email");
 // Enhanced logging utility
 const logError = (error, context, additionalInfo) => {
-    const errorInfo = {
-        timestamp: new Date().toISOString(),
-        context,
-        error: {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
-        },
-        ...additionalInfo
-    };
-    console.error(JSON.stringify(errorInfo, null, 2));
+    // Add immediate console.error for visibility
+    console.error(`[ERROR] ${context}:`, error.message);
+    try {
+        const errorInfo = {
+            timestamp: new Date().toISOString(),
+            context,
+            error: {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+            },
+            ...additionalInfo
+        };
+        console.error(JSON.stringify(errorInfo));
+    }
+    catch (e) {
+        // Fallback if JSON.stringify fails
+        console.error('Raw error info:', error, 'Context:', context, 'Additional info:', additionalInfo);
+    }
 };
 const logInfo = (message, data) => {
-    const logInfo = {
-        timestamp: new Date().toISOString(),
-        message,
-        ...data
-    };
-    console.log(JSON.stringify(logInfo, null, 2));
+    // Add immediate console.log for visibility
+    console.log(`[INFO] ${message}`);
+    try {
+        const logInfo = {
+            timestamp: new Date().toISOString(),
+            message,
+            ...data
+        };
+        console.log(JSON.stringify(logInfo));
+    }
+    catch (e) {
+        // Fallback if JSON.stringify fails
+        console.log('Raw log info:', message, 'Data:', data);
+    }
 };
 // Request logging middleware
 const requestLogger = (req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - start;
-        logInfo('Request completed', {
-            method: req.method,
-            path: req.path,
-            statusCode: res.statusCode,
-            duration: `${duration}ms`,
-            userAgent: req.get('user-agent'),
-            ip: req.ip
-        });
+        try {
+            logInfo('Request completed', {
+                method: req.method,
+                path: req.path,
+                statusCode: res.statusCode,
+                duration: `${duration}ms`,
+                userAgent: req.get('user-agent'),
+                ip: req.ip
+            });
+        }
+        catch (e) {
+            console.error('Error in request logger:', e);
+        }
     });
     next();
 };
@@ -936,19 +957,27 @@ app.get('/api/account/usage', auth_1.auth, async (req, res) => {
 app.post('/api/webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    // Immediate console log for webhook receipt
+    console.log('Webhook received:', {
+        signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
+        type: req.headers['stripe-event-type']
+    });
     logInfo('Received webhook', {
         signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
         type: req.headers['stripe-event-type']
     });
     if (!sig || !webhookSecret) {
+        console.error('Missing webhook signature or secret');
         logError(new Error('Missing webhook signature or secret'), 'Stripe webhook');
         return res.status(400).json({ error: 'Missing webhook signature or secret' });
     }
     let event;
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        console.log('Webhook event constructed successfully:', event.type);
     }
     catch (error) {
+        console.error('Webhook signature verification failed:', error);
         logError(error, 'Stripe webhook signature verification', {
             signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
             body: JSON.stringify(req.body).substring(0, 100) + '...'
