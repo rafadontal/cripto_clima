@@ -27,9 +27,53 @@ import Stripe from 'stripe';
 import { getStripeConfig } from './config';
 import { sendWelcomeEmail, sendPaymentSuccessEmail, sendPaymentFailedEmail, sendPasswordResetEmail, sendSubscriptionCancelledEmail } from './services/email';
 
+// Enhanced logging utility
+const logError = (error: any, context: string, additionalInfo?: any) => {
+  const errorInfo = {
+    timestamp: new Date().toISOString(),
+    context,
+    error: {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    },
+    ...additionalInfo
+  };
+  console.error(JSON.stringify(errorInfo, null, 2));
+};
+
+const logInfo = (message: string, data?: any) => {
+  const logInfo = {
+    timestamp: new Date().toISOString(),
+    message,
+    ...data
+  };
+  console.log(JSON.stringify(logInfo, null, 2));
+};
+
+// Request logging middleware
+const requestLogger = (req: Request, res: Response, next: Function) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logInfo('Request completed', {
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`,
+      userAgent: req.get('user-agent'),
+      ip: req.ip
+    });
+  });
+  next();
+};
+
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Apply request logging middleware
+app.use(requestLogger);
 
 // Google OAuth setup
 const oauth2Client = new google.auth.OAuth2(
@@ -60,7 +104,7 @@ async function connectToMongo() {
   try {
     client = new MongoClient(process.env.MONGODB_URI || '');
     await client.connect();
-    console.log('Connected to MongoDB');
+    logInfo('Connected to MongoDB successfully');
     db = client.db('youtube_summaries');
     usersCollection = db.collection('users');
     channelsCollection = db.collection('channels');
@@ -68,15 +112,15 @@ async function connectToMongo() {
     videosCollection = db.collection('videos');
     userVideoSummariesCollection = db.collection('user_video_summaries');
     
-    // Set users collection in auth middleware
     setUsersCollection(usersCollection);
 
-    // Initialize background jobs
     const { initializeCollections, startBackgroundJobs } = require('./backgroundJobs');
     await initializeCollections(client);
     await startBackgroundJobs();
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    logError(error, 'MongoDB connection', {
+      uri: process.env.MONGODB_URI?.substring(0, 8) + '...'
+    });
     process.exit(1);
   }
 }
@@ -120,6 +164,7 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
   try {
     const { code } = req.query;
     if (!code) {
+      logError(new Error('Missing authorization code'), 'Google OAuth callback');
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
@@ -133,14 +178,14 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
 
     const { data } = await oauth2.userinfo.get();
     if (!data.email) {
+      logError(new Error('Email not found in Google response'), 'Google OAuth callback', { data });
       return res.status(400).json({ error: 'Email not found' });
     }
 
-    // Check if user exists
     let user = await usersCollection.findOne({ email: data.email });
     
     if (!user) {
-      // Create new user
+      logInfo('Creating new user from Google OAuth', { email: data.email });
       const newUser: User = {
         email: data.email,
         name: data.name || '',
@@ -159,10 +204,12 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
       JWT_SECRET
     );
 
-    // Redirect to frontend with token
     res.redirect(`${process.env.FRONTEND_URL}/auth-callback.html?token=${token}`);
   } catch (error) {
-    console.error('Google auth error:', error);
+    logError(error, 'Google OAuth callback', {
+      query: req.query,
+      frontendUrl: process.env.FRONTEND_URL
+    });
     res.redirect(`${process.env.FRONTEND_URL}/login.html?error=Authentication failed`);
   }
 });
@@ -172,16 +219,16 @@ app.post('/api/register', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Check if user already exists
+    logInfo('Attempting user registration', { email });
+
     const existingUser = await usersCollection.findOne({ email });
     if (existingUser) {
+      logError(new Error('User already exists'), 'User registration', { email });
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const user: User = {
       email,
       password: hashedPassword,
@@ -193,13 +240,14 @@ app.post('/api/register', async (req: Request, res: Response) => {
     const result = await usersCollection.insertOne(user);
     const token = jwt.sign({ userId: result.insertedId.toString(), email }, JWT_SECRET);
 
-    // Send welcome email
+    logInfo('User registered successfully', { email, userId: result.insertedId.toString() });
+
     await sendWelcomeEmail(email, email.split('@')[0]);
 
     res.status(201).json({ token });
   } catch (error) {
-    console.error('Error registering user:', error);
-    res.status(500).json({ error: 'Failed to register user' });
+    logError(error, 'User registration', { email: req.body.email });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
@@ -207,41 +255,36 @@ app.post('/api/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
+    logInfo('Login attempt', { email });
+
     const user = await usersCollection.findOne({ email });
     if (!user) {
+      logError(new Error('User not found'), 'Login', { email });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
+    if (!user.password) {
+      logError(new Error('User has no password set'), 'Login', { email });
+      return res.status(401).json({ error: 'Please use Google login' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      logError(new Error('Invalid password'), 'Login', { email });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ userId: user._id.toString(), email }, JWT_SECRET);
-    
-    // Check subscription status
-    if (user.subscriptionStatus === 'active' || 
-        (user.subscriptionStatus === 'cancelled' && user.currentPeriodEnd && new Date(user.currentPeriodEnd) > new Date())) {
-      // User has active subscription or cancelled but still within period, return token and redirect to app
-      return res.json({ 
-        token,
-        subscriptionStatus: 'active',
-        redirectTo: '/index.html'
-      });
-    } else {
-      // User needs to subscribe, return token and redirect to landing
-      return res.json({ 
-        token,
-        subscriptionStatus: 'unpaid',
-        subscriptionRequired: true,
-        redirectTo: '/landing.html'
-      });
-    }
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email },
+      JWT_SECRET
+    );
+
+    logInfo('User logged in successfully', { email, userId: user._id.toString() });
+
+    res.json({ token });
   } catch (error) {
-    console.error('Error logging in:', error);
-    res.status(500).json({ error: 'Failed to log in' });
+    logError(error, 'Login', { email: req.body.email });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
@@ -1061,102 +1104,147 @@ app.get('/api/account/usage', auth, async (req: AuthRequest, res: Response) => {
 
 // Stripe webhook handler
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-    console.log('Received webhook request');
-    if (!stripe) {
-        console.error('Stripe is not initialized');
-        return res.status(503).json({ error: 'Subscription service is currently unavailable' });
-    }
-    const sig = req.headers['stripe-signature'];
-    console.log('Stripe signature:', sig ? 'present' : 'missing');
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    try {
-        console.log('Constructing webhook event...');
-        const event = stripe.webhooks.constructEvent(
-            req.body,
-            sig as string,
-            getStripeConfig().webhookSecret
-        );
-        console.log('Webhook event type:', event.type);
+  logInfo('Received webhook', { 
+    signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
+    type: req.headers['stripe-event-type']
+  });
 
-        switch (event.type) {
-            case 'checkout.session.completed': {
-                console.log('Processing checkout.session.completed event');
-                const session = event.data.object as Stripe.Checkout.Session;
-                const userId = session.metadata?.userId;
-                const planId = session.metadata?.planId;
-                console.log('Session metadata:', { userId, planId });
+  if (!sig || !webhookSecret) {
+    logError(new Error('Missing webhook signature or secret'), 'Stripe webhook');
+    return res.status(400).json({ error: 'Missing webhook signature or secret' });
+  }
 
-                if (!userId || !planId) {
-                    console.error('Missing metadata in session:', session.metadata);
-                    throw new Error('Missing metadata');
-                }
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (error) {
+    logError(error, 'Stripe webhook signature verification', {
+      signature: typeof sig === 'string' ? sig.substring(0, 8) + '...' : 'missing',
+      body: JSON.stringify(req.body).substring(0, 100) + '...'
+    });
+    return res.status(400).json({ error: 'Webhook signature verification failed' });
+  }
 
-                const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
-                if (!plan) {
-                    throw new Error('Invalid plan');
-                }
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata?.userId;
 
-                // Get the subscription to get the current period end
-                const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as Stripe.Subscription;
-                const nextBillingDate = new Date((subscription as any).current_period_end * 1000);
+        logInfo('Processing checkout session completion', {
+          sessionId: session.id,
+          userId,
+          customerEmail: session.customer_email
+        });
 
-                // Get promo code information if used
-                let promoCode = null;
-                if (session.total_details?.breakdown?.discounts && session.total_details.breakdown.discounts.length > 0) {
-                    const discount = session.total_details.breakdown.discounts[0] as any;
-                    promoCode = discount.promotion_code?.code || discount.coupon?.id;
-                }
-
-                // Get user information
-                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-                if (!user) {
-                    throw new Error('User not found');
-                }
-
-                // Calculate the final amount paid (after any discounts)
-                const amountPaid = session.amount_total ? session.amount_total / 100 : plan.price;
-
-                // Update user subscription
-                await usersCollection.updateOne(
-                    { _id: new ObjectId(userId) },
-                    {
-                        $set: {
-                            tier: plan.tier,
-                            subscriptionStatus: 'active',
-                            stripeSubscriptionId: session.subscription as string,
-                            currentPeriodEnd: nextBillingDate,
-                            subscriptionStartDate: new Date(),
-                            promoCode: promoCode
-                        }
-                    }
-                );
-
-                // Send payment success email with amount
-                await sendPaymentSuccessEmail(user.email, user.name || user.email.split('@')[0], plan.name, amountPaid);
-
-                break;
-            }
-
-            case 'checkout.session.expired': {
-                const session = event.data.object as Stripe.Checkout.Session;
-                const userId = session.metadata?.userId;
-
-                if (userId) {
-                    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-                    if (user) {
-                        // Send payment failed email
-                        await sendPaymentFailedEmail(user.email, user.name || user.email.split('@')[0]);
-                    }
-                }
-                break;
-            }
+        if (!userId) {
+          throw new Error('No userId in session metadata');
         }
 
-        res.json({ received: true });
-    } catch (error: any) {
-        console.error('Webhook error:', error);
-        res.status(400).send(`Webhook Error: ${error.message}`);
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (!user) {
+          throw new Error(`User not found: ${userId}`);
+        }
+
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as Stripe.Subscription;
+        const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        
+        await usersCollection.updateOne(
+          { _id: new ObjectId(userId) },
+          {
+            $set: {
+              subscriptionId: subscription.id,
+              subscriptionStatus: 'active',
+              tier: subscription.items.data[0].price.nickname || 'basic',
+              currentPeriodEnd
+            }
+          }
+        );
+
+        logInfo('Subscription activated successfully', {
+          userId,
+          subscriptionId: subscription.id,
+          tier: subscription.items.data[0].price.nickname
+        });
+
+        await sendPaymentSuccessEmail(user.email, user.name || user.email.split('@')[0], 'Subscription', 0);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const user = await usersCollection.findOne({ subscriptionId: subscription.id });
+
+        logInfo('Processing subscription deletion', {
+          subscriptionId: subscription.id,
+          userId: user?._id.toString()
+        });
+
+        if (user) {
+          const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+          
+          await usersCollection.updateOne(
+            { _id: user._id },
+            {
+              $set: {
+                subscriptionStatus: 'cancelled',
+                tier: 'basic'
+              }
+            }
+          );
+
+          logInfo('Subscription cancelled successfully', {
+            userId: user._id.toString(),
+            email: user.email
+          });
+
+          await sendSubscriptionCancelledEmail(user.email, user.name || user.email.split('@')[0], currentPeriodEnd);
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = invoice.subscription as string;
+        const user = await usersCollection.findOne({ subscriptionId });
+
+        logInfo('Processing failed payment', {
+          invoiceId: invoice.id,
+          subscriptionId,
+          userId: user?._id.toString()
+        });
+
+        if (user) {
+          await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: { subscriptionStatus: 'payment_failed' } }
+          );
+
+          logInfo('Updated user subscription status to payment_failed', {
+            userId: user._id.toString(),
+            email: user.email
+          });
+
+          await sendPaymentFailedEmail(user.email, user.name || user.email.split('@')[0]);
+        }
+        break;
+      }
+
+      default:
+        logInfo('Unhandled webhook event type', { type: event.type });
     }
+
+    res.json({ received: true });
+  } catch (error) {
+    logError(error, 'Webhook processing', {
+      eventType: event.type,
+      eventId: event.id
+    });
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
 });
 
 // Add subscription verification endpoint
