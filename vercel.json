@@ -4,7 +4,7 @@
     "LOG_LEVEL": "info"
   },
   "functions": {
-    "api/**/*.ts": {
+    "app/api/**/*.ts": {
       "memory": 1024,
       "maxDuration": 10
     }
