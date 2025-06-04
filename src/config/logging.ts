@@ -1,34 +1,22 @@
 import { createLogger, format, transports } from 'winston';
 
 const logger = createLogger({
-  level: 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: format.combine(
     format.timestamp(),
     format.json()
   ),
   transports: [
-    // Write all logs to console
+    // Write all logs to console with enhanced formatting
     new transports.Console({
       format: format.combine(
         format.colorize(),
-        format.simple()
-      )
-    }),
-    // Write all logs with level 'error' and below to error.log
-    new transports.File({ 
-      filename: 'error.log', 
-      level: 'error',
-      format: format.combine(
         format.timestamp(),
-        format.json()
-      )
-    }),
-    // Write all logs with level 'info' and below to combined.log
-    new transports.File({ 
-      filename: 'combined.log',
-      format: format.combine(
-        format.timestamp(),
-        format.json()
+        format.printf(({ timestamp, level, message, ...meta }) => {
+          return `${timestamp} [${level}]: ${message} ${
+            Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
+          }`;
+        })
       )
     })
   ]

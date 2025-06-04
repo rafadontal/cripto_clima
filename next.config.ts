@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
     // Will be available on both server and client
     logging: true,
   },
+  // Add Vercel-specific configuration
+  env: {
+    LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  },
 };
 
 export default nextConfig;
