@@ -2,11 +2,5 @@
   "version": 2,
   "env": {
     "LOG_LEVEL": "info"
-  },
-  "functions": {
-    "app/api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
   }
 } 
