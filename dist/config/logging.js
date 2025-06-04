@@ -3,23 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.stream = void 0;
 const winston_1 = require("winston");
 const logger = (0, winston_1.createLogger)({
-    level: 'info',
+    level: process.env.LOG_LEVEL || 'info',
     format: winston_1.format.combine(winston_1.format.timestamp(), winston_1.format.json()),
     transports: [
-        // Write all logs to console
+        // Write all logs to console with enhanced formatting
         new winston_1.transports.Console({
-            format: winston_1.format.combine(winston_1.format.colorize(), winston_1.format.simple())
-        }),
-        // Write all logs with level 'error' and below to error.log
-        new winston_1.transports.File({
-            filename: 'error.log',
-            level: 'error',
-            format: winston_1.format.combine(winston_1.format.timestamp(), winston_1.format.json())
-        }),
-        // Write all logs with level 'info' and below to combined.log
-        new winston_1.transports.File({
-            filename: 'combined.log',
-            format: winston_1.format.combine(winston_1.format.timestamp(), winston_1.format.json())
+            format: winston_1.format.combine(winston_1.format.colorize(), winston_1.format.timestamp(), winston_1.format.printf(({ timestamp, level, message, ...meta }) => {
+                return `${timestamp} [${level}]: ${message} ${Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''}`;
+            }))
         })
     ]
 });

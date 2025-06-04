@@ -104,7 +104,7 @@ const requestLogger = (req, res, next) => {
     next();
 };
 const app = (0, express_1.default)();
-const port = process.env.PORT || 3000;
+const port = parseInt(process.env.PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Use Morgan for HTTP request logging
 app.use((0, morgan_1.default)('combined', { stream: logging_1.stream }));
@@ -1372,9 +1372,29 @@ app.post('/api/subscription/cancel', auth_1.auth, async (req, res) => {
 });
 // Static files (should be last)
 app.use(express_1.default.static(path_1.default.join(__dirname, '../public')));
-// Start server
-connectToMongo().then(() => {
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
-    });
-});
+// Start the server with error handling
+const startServer = async () => {
+    try {
+        await connectToMongo();
+        app.listen(port, () => {
+            logging_1.default.info(`Server is running on port ${port}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                const nextPort = port + 1;
+                logging_1.default.warn(`Port ${port} is in use, trying ${nextPort}`);
+                app.listen(nextPort, () => {
+                    logging_1.default.info(`Server is running on port ${nextPort}`);
+                });
+            }
+            else {
+                logging_1.default.error('Failed to start server:', err);
+                process.exit(1);
+            }
+        });
+    }
+    catch (error) {
+        logging_1.default.error('Failed to start application:', error);
+        process.exit(1);
+    }
+};
+startServer();

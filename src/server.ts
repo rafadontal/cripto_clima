@@ -71,7 +71,7 @@ const requestLogger = (req: Request, res: Response, next: Function) => {
 };
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = parseInt(process.env.PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Use Morgan for HTTP request logging
@@ -1610,9 +1610,28 @@ app.post('/api/subscription/cancel', auth, async (req: AuthRequest, res: Respons
 // Static files (should be last)
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Start server
-connectToMongo().then(() => {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-}); 
+// Start the server with error handling
+const startServer = async () => {
+  try {
+    await connectToMongo();
+    app.listen(port, () => {
+      logger.info(`Server is running on port ${port}`);
+    }).on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        const nextPort = port + 1;
+        logger.warn(`Port ${port} is in use, trying ${nextPort}`);
+        app.listen(nextPort, () => {
+          logger.info(`Server is running on port ${nextPort}`);
+        });
+      } else {
+        logger.error('Failed to start server:', err);
+        process.exit(1);
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to start application:', error);
+    process.exit(1);
+  }
+};
+
+startServer(); 
