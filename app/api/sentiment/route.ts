@@ -1,25 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logApiRequest, logApiResponse, logError } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
+import { ValidationError, handleError } from '../../utils/errors';
 
 export async function POST(req: NextRequest) {
-  const start = Date.now();
-  
+  const logger = createLogger({
+    path: '/api/sentiment',
+    method: 'POST'
+  });
+
   try {
-    logApiRequest(req);
     const body = await req.json();
     
+    // Validate input
+    if (!body.text) {
+      throw new ValidationError('Text is required', {
+        field: 'text',
+        received: body
+      });
+    }
+    
     // Your sentiment analysis logic here
+    logger.info('Processing sentiment analysis', { textLength: body.text.length });
     
-    const duration = Date.now() - start;
-    logApiResponse(req, 200, duration);
-    
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      sentiment: 'positive' // Replace with actual analysis
+    });
   } catch (error) {
-    logError(error, 'sentiment-analysis');
-    
-    return NextResponse.json(
-      { error: 'Failed to process sentiment analysis' },
-      { status: 500 }
-    );
+    logger.error('Sentiment analysis failed', error);
+    const { statusCode, body } = handleError(error);
+    return NextResponse.json(body, { status: statusCode });
   }
 }
