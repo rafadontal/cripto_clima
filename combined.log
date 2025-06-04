@@ -1,0 +1,2 @@
+{"JWT_SECRET":"undefined...","MONGODB_URI":"mongodb+...","RESEND_API_KEY":"re_VKELw...","STRIPE_SECRET_KEY":"sk_test_...","STRIPE_WEBHOOK_SECRET":"whsec_b8...","level":"info","message":"Environment variables loaded:","timestamp":"2025-06-04T16:23:41.617Z"}
+{"level":"info","message":"[INFO] Connected to MongoDB successfully","timestamp":"2025-06-04T16:23:45.729Z"}

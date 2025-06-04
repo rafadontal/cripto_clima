@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -9,15 +42,18 @@ exports.generateSummary = generateSummary;
 // Add dynamic export at the top of the file
 exports.dynamic = 'force-dynamic';
 const dotenv_1 = __importDefault(require("dotenv"));
+const morgan_1 = __importDefault(require("morgan"));
+const logging_1 = __importStar(require("./config/logging"));
 // Load environment variables with override
 dotenv_1.default.config({ override: true });
 // Debug: Log all environment variables (safely)
-console.log('Environment variables loaded:');
-console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
-console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
-console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
-console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
-console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY?.substring(0, 8) + '...');
+logging_1.default.info('Environment variables loaded:', {
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...',
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...',
+    MONGODB_URI: process.env.MONGODB_URI?.substring(0, 8) + '...',
+    JWT_SECRET: process.env.JWT_SECRET?.substring(0, 8) + '...',
+    RESEND_API_KEY: process.env.RESEND_API_KEY?.substring(0, 8) + '...'
+});
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const mongodb_1 = require("mongodb");
@@ -34,41 +70,17 @@ const config_2 = require("./config");
 const email_1 = require("./services/email");
 // Enhanced logging utility
 const logError = (error, context, additionalInfo) => {
-    // Add immediate console.error for visibility
-    console.error(`[ERROR] ${context}:`, error.message);
-    try {
-        const errorInfo = {
-            timestamp: new Date().toISOString(),
-            context,
-            error: {
-                message: error.message,
-                stack: error.stack,
-                name: error.name,
-            },
-            ...additionalInfo
-        };
-        console.error(JSON.stringify(errorInfo));
-    }
-    catch (e) {
-        // Fallback if JSON.stringify fails
-        console.error('Raw error info:', error, 'Context:', context, 'Additional info:', additionalInfo);
-    }
+    logging_1.default.error(`[ERROR] ${context}:`, {
+        error: {
+            message: error?.message || 'Unknown error',
+            stack: error?.stack || 'No stack trace',
+            name: error?.name || 'Unknown error type'
+        },
+        ...additionalInfo
+    });
 };
 const logInfo = (message, data) => {
-    // Add immediate console.log for visibility
-    console.log(`[INFO] ${message}`);
-    try {
-        const logInfo = {
-            timestamp: new Date().toISOString(),
-            message,
-            ...data
-        };
-        console.log(JSON.stringify(logInfo));
-    }
-    catch (e) {
-        // Fallback if JSON.stringify fails
-        console.log('Raw log info:', message, 'Data:', data);
-    }
+    logging_1.default.info(`[INFO] ${message}`, data);
 };
 // Request logging middleware
 const requestLogger = (req, res, next) => {
@@ -94,6 +106,8 @@ const requestLogger = (req, res, next) => {
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// Use Morgan for HTTP request logging
+app.use((0, morgan_1.default)('combined', { stream: logging_1.stream }));
 // Apply request logging middleware
 app.use(requestLogger);
 // Google OAuth setup

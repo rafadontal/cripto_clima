@@ -2,17 +2,20 @@
 export const dynamic = 'force-dynamic';
 
 import dotenv from 'dotenv';
+import morgan from 'morgan';
+import logger, { stream } from './config/logging';
 
 // Load environment variables with override
 dotenv.config({ override: true });
 
 // Debug: Log all environment variables (safely)
-console.log('Environment variables loaded:');
-console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
-console.log('STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...');
-console.log('MONGODB_URI:', process.env.MONGODB_URI?.substring(0, 8) + '...');
-console.log('JWT_SECRET:', process.env.JWT_SECRET?.substring(0, 8) + '...');
-console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY?.substring(0, 8) + '...');
+logger.info('Environment variables loaded:', {
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...',
+  MONGODB_URI: process.env.MONGODB_URI?.substring(0, 8) + '...',
+  JWT_SECRET: process.env.JWT_SECRET?.substring(0, 8) + '...',
+  RESEND_API_KEY: process.env.RESEND_API_KEY?.substring(0, 8) + '...'
+});
 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
@@ -32,42 +35,18 @@ import { sendWelcomeEmail, sendPaymentSuccessEmail, sendPaymentFailedEmail, send
 
 // Enhanced logging utility
 const logError = (error: any, context: string, additionalInfo?: any) => {
-  // Add immediate console.error for visibility
-  console.error(`[ERROR] ${context}:`, error.message);
-  
-  try {
-    const errorInfo = {
-      timestamp: new Date().toISOString(),
-      context,
-      error: {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      },
-      ...additionalInfo
-    };
-    console.error(JSON.stringify(errorInfo));
-  } catch (e) {
-    // Fallback if JSON.stringify fails
-    console.error('Raw error info:', error, 'Context:', context, 'Additional info:', additionalInfo);
-  }
+  logger.error(`[ERROR] ${context}:`, {
+    error: {
+      message: error?.message || 'Unknown error',
+      stack: error?.stack || 'No stack trace',
+      name: error?.name || 'Unknown error type'
+    },
+    ...additionalInfo
+  });
 };
 
 const logInfo = (message: string, data?: any) => {
-  // Add immediate console.log for visibility
-  console.log(`[INFO] ${message}`);
-  
-  try {
-    const logInfo = {
-      timestamp: new Date().toISOString(),
-      message,
-      ...data
-    };
-    console.log(JSON.stringify(logInfo));
-  } catch (e) {
-    // Fallback if JSON.stringify fails
-    console.log('Raw log info:', message, 'Data:', data);
-  }
+  logger.info(`[INFO] ${message}`, data);
 };
 
 // Request logging middleware
@@ -94,6 +73,9 @@ const requestLogger = (req: Request, res: Response, next: Function) => {
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Use Morgan for HTTP request logging
+app.use(morgan('combined', { stream }));
 
 // Apply request logging middleware
 app.use(requestLogger);
