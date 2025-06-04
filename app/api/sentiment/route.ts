@@ -1,25 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import logger from '../../utils/logger';
+import { logApiRequest, logApiResponse, logError } from '../../utils/logger';
 
 export async function POST(req: NextRequest) {
+  const start = Date.now();
+  
   try {
-    logger.info('Processing sentiment analysis request', {
-      url: req.url,
-      method: req.method
-    });
-
+    logApiRequest(req);
     const body = await req.json();
     
     // Your sentiment analysis logic here
     
-    logger.info('Sentiment analysis completed successfully');
+    const duration = Date.now() - start;
+    logApiResponse(req, 200, duration);
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error('Error in sentiment analysis', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    logError(error, 'sentiment-analysis');
     
     return NextResponse.json(
       { error: 'Failed to process sentiment analysis' },

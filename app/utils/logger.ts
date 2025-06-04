@@ -4,49 +4,47 @@ const logger = createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: format.combine(
     format.timestamp(),
-    format.json()
-  ),
-  defaultMeta: { service: 'resumotube-api' },
-  transports: [
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.timestamp(),
-        format.printf(({ timestamp, level, message, service, ...meta }) => {
-          return `${timestamp} [${level}] [${service}]: ${message} ${
-            Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
-          }`;
-        })
-      )
+    format.printf(({ timestamp, level, message, ...meta }) => {
+      // Format that matches Vercel's expected format
+      return JSON.stringify({
+        timestamp,
+        level,
+        message,
+        ...meta
+      });
     })
+  ),
+  transports: [
+    new transports.Console()
   ]
 });
 
-export const logApiRequest = (req: Request, res: Response, next?: () => void) => {
-  const start = Date.now();
+// Helper functions for common logging patterns
+export const logApiRequest = (req: Request) => {
   const { method, url } = req;
-  
-  // Log request start
-  logger.info('API Request started', {
+  logger.info('API Request', {
     method,
     url,
     timestamp: new Date().toISOString()
   });
+};
 
-  // If this is an Express middleware
-  if (res.on) {
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      logger.info('API Request completed', {
-        method,
-        url,
-        statusCode: res.statusCode,
-        duration: `${duration}ms`
-      });
-    });
-  }
+export const logApiResponse = (req: Request, statusCode: number, duration: number) => {
+  const { method, url } = req;
+  logger.info('API Response', {
+    method,
+    url,
+    statusCode,
+    duration: `${duration}ms`
+  });
+};
 
-  if (next) next();
+export const logError = (error: unknown, context: string) => {
+  logger.error('Error', {
+    context,
+    error: error instanceof Error ? error.message : 'Unknown error',
+    stack: error instanceof Error ? error.stack : undefined
+  });
 };
 
 export default logger; 
