@@ -54,20 +54,29 @@ def get_video_ids(keyword: str, max_results: int = 3) -> List[str]:
 def get_transcript(video_id: str) -> Optional[str]:
     """Fetch transcript with enhanced error handling"""
     try:
+        logger.info(f"Attempting to fetch transcript for video ID: {video_id}")
         # Fetch available transcripts first to check for English
         available_transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-        transcript_en = available_transcripts.find_generated_transcript(['en'])
+        logger.info(f"Available transcripts: {[t.language_code for t in available_transcripts]}")
+        
+        try:
+            transcript_en = available_transcripts.find_generated_transcript(['en'])
+            logger.info("Found English transcript")
+        except Exception as e:
+            logger.warning(f"Could not find English transcript, trying manual transcript: {e}")
+            transcript_en = available_transcripts.find_manually_created_transcript(['en'])
 
         # Fetch the actual transcript data
         transcript_list = transcript_en.fetch()
+        logger.info(f"Successfully fetched transcript with {len(transcript_list)} segments")
 
         # Combine transcript text
         full_transcript = ' '.join([entry['text'] for entry in transcript_list])
-        logger.info(f"Successfully fetched transcript for video ID: {video_id}")
+        logger.info(f"Successfully combined transcript for video ID: {video_id}")
         return full_transcript
 
     except Exception as e:
-        logger.warning(f"Could not retrieve transcript for video ID {video_id}: {e}")
+        logger.error(f"Could not retrieve transcript for video ID {video_id}: {str(e)}", exc_info=True)
         return None
 
 def analyze_sentiment(transcript: str) -> Optional[Dict[str, str]]:
