@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '../../utils/logger';
 import { ValidationError, handleError } from '../../utils/errors';
 
+// Force dynamic rendering to ensure runtime logging works
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   const logger = createLogger({
     path: '/api/sentiment',
