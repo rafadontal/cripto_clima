@@ -14,11 +14,13 @@
     "@types/jsonwebtoken": "^9.0.9",
     "@types/morgan": "^1.9.9",
     "@types/stripe": "^8.0.416",
+    "axios-proxy-fix": "^0.16.3",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "googleapis": "^129.0.0",
+    "https-proxy-agent": "^7.0.6",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.3.0",
     "morgan": "^1.10.0",
@@ -30,6 +32,7 @@
     "youtube-transcript": "^1.0.6"
   },
   "devDependencies": {
+    "@types/axios": "^0.9.36",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/next": "^8.0.7",

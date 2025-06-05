@@ -44,6 +44,8 @@ exports.dynamic = 'force-dynamic';
 const dotenv_1 = __importDefault(require("dotenv"));
 const morgan_1 = __importDefault(require("morgan"));
 const logging_1 = __importStar(require("./config/logging"));
+const axios_proxy_fix_1 = __importDefault(require("axios-proxy-fix"));
+const youtube_transcript_1 = require("youtube-transcript");
 // Load environment variables with override
 dotenv_1.default.config({ override: true });
 // Debug: Log all environment variables (safely)
@@ -59,7 +61,6 @@ const cors_1 = __importDefault(require("cors"));
 const mongodb_1 = require("mongodb");
 const openai_1 = require("openai");
 const googleapis_1 = require("googleapis");
-const youtube_transcript_1 = require("youtube-transcript");
 const path_1 = __importDefault(require("path"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -687,7 +688,33 @@ async function getLatestVideo(channelId) {
 }
 async function generateSummary(videoId) {
     try {
-        const transcript = await youtube_transcript_1.YoutubeTranscript.fetchTranscript(videoId);
+        // Validate proxy configuration
+        const proxyHost = process.env.PROXY_HOST;
+        const proxyPort = process.env.PROXY_PORT;
+        const proxyUsername = process.env.PROXY_USERNAME;
+        const proxyPassword = process.env.PROXY_PASSWORD;
+        if (!proxyHost || !proxyPort || !proxyUsername || !proxyPassword) {
+            logging_1.default.error('Missing proxy configuration');
+            throw new Error('Proxy configuration is incomplete');
+        }
+        // Configure proxy for transcript fetching
+        const proxyConfig = {
+            host: proxyHost,
+            port: parseInt(proxyPort, 10),
+            auth: {
+                username: proxyUsername,
+                password: proxyPassword
+            }
+        };
+        // Use axios with proxy for transcript fetching
+        const transcriptResponse = await axios_proxy_fix_1.default.get(`https://www.youtube.com/watch?v=${videoId}`, {
+            proxy: proxyConfig,
+            timeout: 10000 // 10 second timeout
+        });
+        const transcript = await youtube_transcript_1.YoutubeTranscript.fetchTranscript(videoId, {
+            lang: 'en',
+            country: 'US'
+        });
         // Check if transcript is empty or too short
         if (!transcript || transcript.length === 0) {
             console.log(`No transcript available for video ${videoId}`);
