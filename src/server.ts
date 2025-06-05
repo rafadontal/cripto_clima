@@ -4,8 +4,6 @@ export const dynamic = 'force-dynamic';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 import logger, { stream } from './config/logging';
-import axios from 'axios-proxy-fix';
-import { YoutubeTranscript, TranscriptConfig } from 'youtube-transcript';
 
 // Load environment variables with override
 dotenv.config({ override: true });
@@ -24,6 +22,7 @@ import cors from 'cors';
 import { MongoClient, ObjectId } from 'mongodb';
 import { OpenAI } from 'openai';
 import { google } from 'googleapis';
+import { YoutubeTranscript } from 'youtube-transcript';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -783,40 +782,7 @@ interface SummaryResult {
 
 async function generateSummary(videoId: string): Promise<SummaryResult | null> {
   try {
-    // Validate proxy configuration
-    const proxyHost = process.env.PROXY_HOST;
-    const proxyPort = process.env.PROXY_PORT;
-    const proxyUsername = process.env.PROXY_USERNAME;
-    const proxyPassword = process.env.PROXY_PASSWORD;
-
-    if (!proxyHost || !proxyPort || !proxyUsername || !proxyPassword) {
-      logger.error('Missing proxy configuration');
-      throw new Error('Proxy configuration is incomplete');
-    }
-
-    // Configure proxy for transcript fetching
-    const proxyConfig = {
-      host: proxyHost,
-      port: parseInt(proxyPort, 10),
-      auth: {
-        username: proxyUsername,
-        password: proxyPassword
-      }
-    };
-
-    // Use axios with proxy for transcript fetching
-    const transcriptResponse = await axios.get(
-      `https://www.youtube.com/watch?v=${videoId}`,
-      { 
-        proxy: proxyConfig,
-        timeout: 10000 // 10 second timeout
-      }
-    );
-
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-      lang: 'en',
-      country: 'US'
-    } as TranscriptConfig);
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
     
     // Check if transcript is empty or too short
     if (!transcript || transcript.length === 0) {
