@@ -5,7 +5,12 @@ import { handleError } from './utils/errors';
 
 export async function middleware(request: NextRequest) {
   const start = Date.now();
-  const logger = createLogger();
+  const logger = createLogger({
+    path: request.nextUrl.pathname,
+    method: request.method
+  });
+
+  // Log the incoming request
   const requestId = logApiRequest(request, {
     path: request.nextUrl.pathname,
     method: request.method
@@ -14,18 +19,30 @@ export async function middleware(request: NextRequest) {
   try {
     const response = await NextResponse.next();
     
+    // Log the response with duration
     const duration = Date.now() - start;
-    logApiResponse(request, response.status, duration, { requestId });
+    logApiResponse(request, response.status, duration, { 
+      requestId,
+      path: request.nextUrl.pathname,
+      method: request.method
+    });
     
     return response;
   } catch (error) {
-    logger.error('Middleware error', error, { requestId });
-    const { statusCode, body } = handleError(error);
+    // Log the error with full context
+    logger.error('Middleware error', error, { 
+      requestId,
+      path: request.nextUrl.pathname,
+      method: request.method,
+      duration: Date.now() - start
+    });
     
+    const { statusCode, body } = handleError(error);
     return NextResponse.json(body, { status: statusCode });
   }
 }
 
+// Configure middleware to run on all API routes
 export const config = {
   matcher: [
     '/api/:path*',

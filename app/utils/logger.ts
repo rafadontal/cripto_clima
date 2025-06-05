@@ -13,9 +13,10 @@ const getRequestId = () => {
 };
 
 const formatLog = (level: LogLevel, message: string, context?: LogContext) => {
+  // Vercel expects a specific format for logs
   const logEntry = {
     timestamp: new Date().toISOString(),
-    level,
+    level: level.toUpperCase(), // Vercel expects uppercase log levels
     message,
     requestId: context?.requestId || getRequestId(),
     ...context
@@ -26,12 +27,14 @@ const formatLog = (level: LogLevel, message: string, context?: LogContext) => {
     logEntry[key] === undefined && delete logEntry[key]
   );
 
+  // Return as a single line JSON string
   return JSON.stringify(logEntry);
 };
 
 const log = (level: LogLevel, message: string, context?: LogContext) => {
   const formattedLog = formatLog(level, message, context);
   
+  // Use console methods that Vercel recognizes
   switch (level) {
     case 'error':
       console.error(formattedLog);
@@ -57,7 +60,9 @@ export const createLogger = (context: LogContext = {}) => ({
     const errorContext = error instanceof Error ? {
       errorName: error.name,
       errorMessage: error.message,
-      errorStack: error.stack
+      errorStack: error.stack,
+      // Add status code for better error tracking
+      statusCode: error instanceof Error && 'statusCode' in error ? (error as any).statusCode : 500
     } : { error };
     
     log('error', message, { ...context, ...errorContext, ...meta });
@@ -93,7 +98,10 @@ export const logApiResponse = (
 ) => {
   const { method, url } = req;
   
-  log('info', 'API Response', {
+  // Use warn level for 4xx status codes and error for 5xx
+  const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
+  
+  log(level, 'API Response', {
     ...context,
     method,
     url,
